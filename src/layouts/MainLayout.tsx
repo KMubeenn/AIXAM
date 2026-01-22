@@ -4,7 +4,7 @@ import Navbar from "../components/Navbar";
 
 const MainLayout: React.FC = () => {
   return (
-    <div className="min-h-screen bg-[#f5f7fb] dark:bg-radial-dark text-gray-900 dark:text-white font-poppins">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 font-poppins selection:bg-teal-300 selection:text-teal-900">
       <Navbar />
       <main>
         <Outlet />

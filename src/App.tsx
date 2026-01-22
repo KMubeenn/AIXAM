@@ -1,33 +1,28 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import StudentDashboard from "./pages/StudentDashboard";
+import TeacherDashboard from "./pages/TeacherDashboard";
+import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 
-import MainLayout from "./layouts/MainLayout";
 import AuthLayout from "./layouts/AuthLayout";
 
 import Home from "./pages/Home";
-import About from "./pages/About";
-import WhyUs from "./pages/WhyUs";
 
 import LoginT from "./components/LoginT";
 import LoginS from "./components/LoginS";
 import CreateAccount from "./components/CreateAccount";
 
-const LandingPage = () => (
-  <>
-    <Home />
-    <About />
-    <WhyUs />
-  </>
-);
-
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        {/* Main Routes (with Navbar) */}
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<LandingPage />} />
-        </Route>
+        {/* Home Route (Standalone Layout) */}
+        <Route path="/" element={<Home />} />
+        <Route path="/student-dashboard" element={<StudentDashboard />} />
+        <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+        <Route path="/analytics" element={<AnalyticsDashboard />} />
+
+        {/* Auth Routes */}
 
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>
