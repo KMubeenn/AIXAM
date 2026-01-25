@@ -1,9 +1,9 @@
 import React from "react";
-import Navbar from "../components/home/Navbar";
-import Hero from "../components/home/Hero";
-import Features from "../components/home/Features";
-import InteractivePreview from "../components/home/InteractivePreview";
-import Footer from "../components/home/Footer";
+import Navbar from "./components/Navbar";
+import Hero from "./components/Hero";
+import Features from "./components/Features";
+import InteractivePreview from "./components/InteractivePreview";
+import Footer from "./components/Footer";
 
 const Home: React.FC = () => {
   return (

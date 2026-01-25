@@ -9,9 +9,9 @@ import {
   FiArrowLeft,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import logoImg from "../assets/logo.png";
+import logoImg from "../../assets/logo.png";
 
-const LoginS: React.FC = () => {
+const LoginT: React.FC = () => {
   const [showPass, setShowPass] = useState<boolean>(false);
   const navigate = useNavigate();
 
@@ -22,7 +22,8 @@ const LoginS: React.FC = () => {
         className="absolute top-6 left-7 flex items-center gap-2 font-poppins font-semibold cursor-pointer z-10 bg-gradient-to-r from-[#5eead4] to-[#60a5fa] bg-clip-text text-transparent hover:opacity-80 transition-opacity"
         onClick={() => navigate("/")}
       >
-        <FiArrowLeft className="text-[#5eead4]" />
+        <FiArrowLeft className="text-[#5eead4]" />{" "}
+        {/* Gradient text doesn't work well on icons typically, so setting text color or needing a wrapper. Original CSS applied gradient to text-fill-color transparent, which affects icons if they are text. */}
         <span>Back to Home</span>
       </div>
 
@@ -46,7 +47,7 @@ const LoginS: React.FC = () => {
 
         <div className="flex justify-center items-center gap-2.5 my-[14px] mb-7 text-[1.2rem] font-semibold font-poppins bg-gradient-to-r from-[#5eead4] to-[#60a5fa] bg-clip-text text-transparent">
           <FiUserCheck className="text-[#5eead4]" />
-          Welcome Student
+          Welcome Teacher
         </div>
 
         <div className="relative w-[80%] mb-[18px]">
@@ -90,4 +91,4 @@ const LoginS: React.FC = () => {
   );
 };
 
-export default LoginS;
+export default LoginT;

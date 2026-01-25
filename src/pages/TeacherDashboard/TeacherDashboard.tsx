@@ -1,8 +1,8 @@
 import React from "react";
-import Sidebar from "../components/teacher-dashboard/Sidebar";
-import Header from "../components/teacher-dashboard/Header";
-import StatsCards from "../components/teacher-dashboard/StatsCards";
-import AssignmentGenerator from "../components/teacher-dashboard/AssignmentGenerator";
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+import StatsCards from "./components/StatsCards";
+import AssignmentGenerator from "./components/AssignmentGenerator";
 
 const TeacherDashboard: React.FC = () => {
   return (

@@ -1,6 +1,6 @@
 import React from "react";
-import bgVideo from "../assets/bg.mp4";
-import whyUsImg from "../assets/whyy.png";
+import bgVideo from "../../assets/bg.mp4";
+import whyUsImg from "../../assets/whyy.png";
 
 const WhyUs: React.FC = () => {
   return (

@@ -1,9 +1,9 @@
 import React from "react";
-import Sidebar from "../components/analytics/Sidebar";
-import ScoreCards from "../components/analytics/ScoreCards";
-import ChartsSection from "../components/analytics/ChartsSection";
-import TopicPerformance from "../components/analytics/TopicPerformance";
-import Insights from "../components/analytics/Insights";
+import Sidebar from "./components/Sidebar";
+import ScoreCards from "./components/ScoreCards";
+import ChartsSection from "./components/ChartsSection";
+import TopicPerformance from "./components/TopicPerformance";
+import Insights from "./components/Insights";
 
 const AnalyticsDashboard: React.FC = () => {
   return (

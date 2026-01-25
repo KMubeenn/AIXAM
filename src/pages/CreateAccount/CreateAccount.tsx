@@ -2,7 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { FiUser, FiMail, FiLock, FiArrowLeft } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import logoImg from "../assets/logo.png";
+import logoImg from "../../assets/logo.png";
 
 const CreateAccount: React.FC = () => {
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ const CreateAccount: React.FC = () => {
             <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               placeholder="Full Name"
-              className="w-[80%] h-[52px] px-[48px] rounded-2xl bg-black border border-white/25 text-white text-[1rem] font-semibold outline-none focus:border-[#5eead4] focus:ring-[3px] focus:ring-[#5eead4]/25 placeholder-[#cbd5f5] transition-all w-full"
+              className="h-[52px] px-[48px] rounded-2xl bg-black border border-white/25 text-white text-[1rem] font-semibold outline-none focus:border-[#5eead4] focus:ring-[3px] focus:ring-[#5eead4]/25 placeholder-[#cbd5f5] transition-all w-full"
               // Note: original css had .field.small { width: 85% } and .field input { width: 80% }.
               // Wait, .field contained input. If .field is 85%, input width: 80% means 80% of 85%. That seems small.
               // Actually looking at CSS:
