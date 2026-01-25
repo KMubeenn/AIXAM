@@ -1,8 +1,10 @@
 import React from "react";
-import { motion } from "framer-motion";
-import { FiUser, FiMail, FiLock, FiArrowLeft } from "react-icons/fi";
+import { FiUser, FiMail, FiLock } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import logoImg from "../../assets/logo.png";
+import logoImg from "../../assets/logo/logo_black.png";
+import Card from "../../components/ui/Card";
+import Input from "../../components/ui/Input";
+import Button from "../../components/ui/Button";
 
 const CreateAccount: React.FC = () => {
   const navigate = useNavigate();
@@ -13,11 +15,7 @@ const CreateAccount: React.FC = () => {
       <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-indigo-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-teal-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
 
-      <motion.div
-        className="w-[420px] max-w-[92%] p-[42px] rounded-[28px] bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl z-[5]"
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <Card>
         {/* LOGO */}
         <img
           src={logoImg}
@@ -31,31 +29,10 @@ const CreateAccount: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex flex-col items-center">
-          <div className="relative w-[85%] mb-[18px]">
-            <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              placeholder="Full Name"
-              className="h-[52px] px-[48px] rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-[1rem] font-semibold outline-none focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/10 placeholder-slate-400 transition-all w-full"
-            />
-          </div>
-
-          <div className="relative w-[85%] mb-[18px]">
-            <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              placeholder="Email"
-              className="w-full h-[52px] px-[48px] rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-[1rem] font-semibold outline-none focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/10 placeholder-slate-400 transition-all"
-            />
-          </div>
-
-          <div className="relative w-[85%] mb-[18px]">
-            <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="password"
-              placeholder="Password"
-              className="w-full h-[52px] px-[48px] rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-[1rem] font-semibold outline-none focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/10 placeholder-slate-400 transition-all"
-            />
-          </div>
+        <div className="flex flex-col items-center w-full">
+          <Input icon={FiUser} placeholder="Full Name" />
+          <Input icon={FiMail} placeholder="Email" />
+          <Input icon={FiLock} type="password" placeholder="Password" />
 
           <div className="relative w-[85%] mb-[18px]">
             <select
@@ -74,10 +51,10 @@ const CreateAccount: React.FC = () => {
           </div>
         </div>
 
-        <button className="w-[70%] h-[54px] mt-[14px] mx-auto block rounded-[18px] font-bold text-[1rem] bg-indigo-600 text-white border-none cursor-pointer hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-200 transition-all">
+        <Button fullWidth className="w-[70%] mt-[14px] mx-auto block">
           Create Account
-        </button>
-      </motion.div>
+        </Button>
+      </Card>
     </div>
   );
 };

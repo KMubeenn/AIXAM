@@ -1,3 +1,4 @@
+import logoImg from "../../../assets/logo/logo_black.png";
 import {
   LuLayoutDashboard,
   LuCloudUpload,
@@ -11,11 +12,8 @@ const Sidebar: React.FC = () => {
   return (
     <aside className="w-full lg:w-64 bg-white border-r border-gray-200 flex-col hidden lg:flex h-screen sticky top-0">
       <div className="p-6 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
-            S
-          </div>
-          <span className="font-bold text-xl text-gray-900">StudyMate</span>
+        <div className="flex items-center justify-center gap-3">
+          <img src={logoImg} alt="AIXAM Logo" className="h-20 w-auto" />
         </div>
       </div>
 

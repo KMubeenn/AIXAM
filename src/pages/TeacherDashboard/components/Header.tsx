@@ -1,4 +1,5 @@
 import React from "react";
+import logoImg from "../../../assets/logo/logo-only-black.png";
 import { LuGraduationCap, LuMenu, LuBell, LuPlus } from "react-icons/lu";
 
 const Header: React.FC = () => {
@@ -7,10 +8,7 @@ const Header: React.FC = () => {
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <div className="bg-indigo-600 p-2 rounded-lg">
-            <LuGraduationCap className="w-6 h-6 text-white" />
-          </div>
-          <span className="font-bold text-xl text-gray-900">EduDash</span>
+          <img src={logoImg} alt="AIXAM Logo" className="h-10 w-auto" />
         </div>
         <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
           <LuMenu className="w-6 h-6" />

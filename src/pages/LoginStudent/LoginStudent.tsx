@@ -1,15 +1,10 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import {
-  FiMail,
-  FiLock,
-  FiEye,
-  FiEyeOff,
-  FiUserCheck,
-  FiArrowLeft,
-} from "react-icons/fi";
+import { FiMail, FiLock, FiEye, FiEyeOff, FiUserCheck } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import logoImg from "../../assets/logo.png";
+import logoImg from "../../assets/logo/logo_black.png";
+import Card from "../../components/ui/Card";
+import Input from "../../components/ui/Input";
+import Button from "../../components/ui/Button";
 
 const LoginS: React.FC = () => {
   const [showPass, setShowPass] = useState<boolean>(false);
@@ -21,11 +16,7 @@ const LoginS: React.FC = () => {
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-teal-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
 
-      <motion.div
-        className="w-[420px] max-w-full p-[42px] rounded-[28px] bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl transition-all duration-400 z-[5] hover:-translate-y-2 flex flex-col items-center"
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <Card>
         {/* LOGO */}
         <img
           src={logoImg}
@@ -40,15 +31,9 @@ const LoginS: React.FC = () => {
           </span>
         </div>
 
-        <div className="relative w-[80%] mb-[18px]">
-          <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            placeholder="Email"
-            className="w-full h-[52px] px-[48px] rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-[0.95rem] outline-none focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/10 placeholder-slate-400 transition-all"
-          />
-        </div>
+        <Input icon={FiMail} placeholder="Email" />
 
-        <div className="relative w-[80%] mb-[18px]">
+        <div className="relative w-[85%] mb-[18px]">
           <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type={showPass ? "text" : "password"}
@@ -63,9 +48,9 @@ const LoginS: React.FC = () => {
           </div>
         </div>
 
-        <button className="w-full h-[54px] mt-2.5 rounded-[18px] font-bold text-[1rem] bg-indigo-600 text-white border-none cursor-pointer hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-200 transition-all">
+        <Button fullWidth className="mt-2.5">
           Login
-        </button>
+        </Button>
 
         <div className="mt-5 text-center text-[0.9rem] text-slate-500">
           Didn’t have account?{" "}
@@ -76,7 +61,7 @@ const LoginS: React.FC = () => {
             Create Account
           </span>
         </div>
-      </motion.div>
+      </Card>
     </div>
   );
 };

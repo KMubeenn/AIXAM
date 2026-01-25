@@ -4,7 +4,7 @@ const DashboardStats: React.FC = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Today's Focus */}
-      <div className="lg:col-span-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+      <div className="lg:col-span-2 bg-indigo-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2 text-indigo-100">

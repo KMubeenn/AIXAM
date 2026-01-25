@@ -1,3 +1,4 @@
+import logoImg from "../../../assets/logo/logo_black.png";
 import {
   LuGraduationCap,
   LuLayoutDashboard,
@@ -12,11 +13,8 @@ import {
 const Sidebar: React.FC = () => {
   return (
     <aside className="w-full lg:w-64 bg-white border-r border-gray-200 flex-shrink-0 hidden lg:flex lg:flex-col h-screen sticky top-0">
-      <div className="p-6 flex items-center gap-3 border-b border-gray-100">
-        <div className="bg-indigo-600 p-2 rounded-lg">
-          <LuGraduationCap className="w-6 h-6 text-white" />
-        </div>
-        <span className="font-bold text-xl text-gray-900">EduDash</span>
+      <div className="p-6 flex items-center justify-center gap-3 border-b border-gray-100">
+        <img src={logoImg} alt="AIXAM Logo" className="h-20 w-auto" />
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
