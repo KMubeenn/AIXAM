@@ -7,7 +7,7 @@ import Footer from "../../components/Footer";
 
 const Home: React.FC = () => {
   return (
-    <div className="bg-slate-50 text-slate-800 font-inter min-h-screen">
+    <div className="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-inter min-h-screen">
       <Navbar />
       <main>
         <Hero />

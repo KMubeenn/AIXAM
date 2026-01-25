@@ -34,20 +34,33 @@ const progressData = [
   { week: "Week 8", score: 82 },
 ];
 
+import { useTheme } from "../../../context/ThemeContext";
+
 const ChartsSection: React.FC = () => {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
+  // Chart Text/Grid Colors
+  const textColor = isDark ? "#94a3b8" : "#4b5563"; // slate-400 vs gray-600
+  const gridColor = isDark ? "#334155" : "#e5e7eb"; // slate-700 vs gray-200
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       {/* Subject Performance Radar Chart */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-slate-800">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Subject Performance
         </h3>
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={subjectData}>
-              <PolarGrid />
-              <PolarAngleAxis dataKey="subject" />
-              <PolarRadiusAxis angle={30} domain={[0, 100]} />
+              <PolarGrid stroke={gridColor} />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: textColor }} />
+              <PolarRadiusAxis
+                angle={30}
+                domain={[0, 100]}
+                tick={{ fill: textColor }}
+              />
               <Radar
                 name="Performance"
                 dataKey="A"
@@ -55,15 +68,21 @@ const ChartsSection: React.FC = () => {
                 fill="#3b82f6"
                 fillOpacity={0.2}
               />
-              <Tooltip />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: isDark ? "#1e293b" : "#fff",
+                  borderColor: isDark ? "#334155" : "#e5e7eb",
+                  color: isDark ? "#f8fafc" : "#000",
+                }}
+              />
             </RadarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Progress Over Time Line Chart */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-slate-800">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Progress Over Time
         </h3>
         <div className="h-80 w-full">
@@ -77,10 +96,16 @@ const ChartsSection: React.FC = () => {
                 bottom: 5,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="week" />
-              <YAxis domain={[60, 100]} />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="week" tick={{ fill: textColor }} />
+              <YAxis domain={[60, 100]} tick={{ fill: textColor }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: isDark ? "#1e293b" : "#fff",
+                  borderColor: isDark ? "#334155" : "#e5e7eb",
+                  color: isDark ? "#f8fafc" : "#000",
+                }}
+              />
               <Line
                 type="monotone"
                 dataKey="score"

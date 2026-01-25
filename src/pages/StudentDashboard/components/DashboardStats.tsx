@@ -34,15 +34,17 @@ const DashboardStats: React.FC = () => {
       </div>
 
       {/* Quick Stats / Progress */}
-      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm flex flex-col justify-between">
-        <h3 className="font-bold text-gray-900 mb-4">Weekly Progress</h3>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+        <h3 className="font-bold text-gray-900 dark:text-white mb-4">
+          Weekly Progress
+        </h3>
         <div className="space-y-4">
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600">Physics</span>
-              <span className="font-medium text-gray-900">85%</span>
+              <p className="text-gray-600 dark:text-slate-400">Physics</p>
+              <p className="font-medium text-gray-900 dark:text-white">85%</p>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
+            <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
               <div
                 className="bg-blue-500 h-2 rounded-full"
                 style={{ width: "85%" }}
@@ -51,10 +53,14 @@ const DashboardStats: React.FC = () => {
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600">Chemistry</span>
-              <span className="font-medium text-gray-900">62%</span>
+              <span className="text-gray-600 dark:text-slate-400">
+                Chemistry
+              </span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                62%
+              </span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
+            <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
               <div
                 className="bg-green-500 h-2 rounded-full"
                 style={{ width: "62%" }}
@@ -63,10 +69,14 @@ const DashboardStats: React.FC = () => {
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600">Mathematics</span>
-              <span className="font-medium text-gray-900">40%</span>
+              <span className="text-gray-600 dark:text-slate-400">
+                Mathematics
+              </span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                40%
+              </span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
+            <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
               <div
                 className="bg-orange-500 h-2 rounded-full"
                 style={{ width: "40%" }}
@@ -74,9 +84,9 @@ const DashboardStats: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-sm text-gray-500 dark:text-slate-500">
           <span>12 hrs studied this week</span>
-          <span className="text-green-600 font-medium flex items-center gap-1">
+          <span className="text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
             <LuTrendingUp className="w-3 h-3" /> +15%
           </span>
         </div>
