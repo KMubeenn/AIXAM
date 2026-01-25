@@ -1,121 +1,77 @@
-import React, { useState, useEffect } from "react";
-import logo from "../assets/logo.png";
-import { useNavigate } from "react-router-dom";
+import React from "react";
+import { Link } from "react-router-dom";
+import { LuBrainCircuit } from "react-icons/lu";
 
 const Navbar: React.FC = () => {
-  const [darkMode, setDarkMode] = useState<boolean>(true);
-  const [menuOpen, setMenuOpen] = useState<boolean>(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // This side effect updates the body class for global dark mode styles if any exist outside of Tailwind's 'dark' class
-    // Tailwind's dark mode strategy is 'class' or 'media'. Since we are toggling a class on body,
-    // we should ensure tailwind is configured to use 'class' strategy or just rely on 'dark' class being present.
-    // Assuming 'dark' class on body triggers dark variant in Tailwind.
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [darkMode]);
-
-  const scrollToSection = (id: string) => {
-    const section = document.getElementById(id);
-    if (section) section.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
-    <nav className="max-w-7xl w-[95%] mx-auto mt-5 px-6 py-3.5 flex items-center justify-between bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 shadow-2xl relative z-50 transition-all duration-300">
-      {/* Logo */}
-      <div className="flex items-center gap-3">
-        <img
-          src={logo}
-          alt="AIXAM Logo"
-          className="w-10 h-10 lg:w-11 lg:h-14 object-contain"
-        />
-        <span className="text-2xl font-semibold tracking-tight">AIXAM</span>
-      </div>
-
-      {/* Desktop Links */}
-      <ul className="hidden md:flex items-center gap-8 list-none">
-        {["home", "about", "whyus"].map((item) => (
-          <li
-            key={item}
-            onClick={() => scrollToSection(item)}
-            className="cursor-pointer font-medium hover:text-teal-400 dark:hover:text-teal-300 transition-colors capitalize text-sm lg:text-base"
-          >
-            {item === "whyus" ? "Why Us" : item}
-          </li>
-        ))}
-      </ul>
-
-      {/* Desktop Buttons */}
-      <div className="hidden md:flex gap-3 items-center">
-        <button
-          className="px-5 py-2.5 rounded-xl border-none text-sm font-medium cursor-pointer bg-gradient-to-br from-sky-50 to-sky-200 text-slate-800 hover:scale-105 transition-transform shadow-sm"
-          onClick={() => navigate("/login-student")}
-        >
-          Student
-        </button>
-        <button
-          className="px-5 py-2.5 rounded-xl border-none text-sm font-medium cursor-pointer bg-gradient-to-br from-teal-50 to-teal-200 text-slate-800 hover:scale-105 transition-transform shadow-sm"
-          onClick={() => navigate("/login-teacher")}
-        >
-          Teacher
-        </button>
-        <button
-          className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer bg-white/10 hover:bg-white/20 transition-colors border border-white/10"
-          onClick={() => setDarkMode(!darkMode)}
-          aria-label="Toggle Dark Mode"
-        >
-          {darkMode ? "🌙" : "☀️"}
-        </button>
-      </div>
-
-      {/* Hamburger */}
-      <div
-        className="flex md:hidden flex-col gap-1.5 cursor-pointer p-1"
-        onClick={() => setMenuOpen(!menuOpen)}
-      >
-        <span className="w-6 h-0.5 bg-current rounded-full block" />
-        <span className="w-6 h-0.5 bg-current rounded-full block" />
-        <span className="w-6 h-0.5 bg-current rounded-full block" />
-      </div>
-
-      {/* Compact Mobile Panel */}
-      {menuOpen && (
-        <div className="absolute top-[110%] right-0 w-64 p-5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-2xl z-50 animate-in fade-in slide-in-from-top-4 flex flex-col gap-4">
-          <ul className="flex flex-col gap-4 list-none p-0 m-0">
-            {["home", "about", "whyus"].map((item) => (
-              <li
-                key={item}
-                onClick={() => {
-                  scrollToSection(item);
-                  setMenuOpen(false);
-                }}
-                className="text-base font-medium cursor-pointer hover:text-teal-500 capitalize"
-              >
-                {item === "whyus" ? "Why Us" : item}
-              </li>
-            ))}
-          </ul>
-
-          <div className="flex flex-col gap-3 mt-2 border-t border-slate-200 dark:border-slate-700 pt-4">
-            <button
-              className="px-5 py-2.5 rounded-xl border-none text-sm font-medium cursor-pointer bg-gradient-to-br from-sky-50 to-sky-200 text-slate-800"
-              onClick={() => navigate("/login-student")}
+    <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16 items-center">
+          <div className="flex items-center gap-2">
+            <div className="bg-indigo-600 p-1.5 rounded-lg">
+              <LuBrainCircuit className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-xl font-bold text-slate-900 tracking-tight">
+              AIXAM
+            </span>
+          </div>
+          <div className="hidden md:flex items-center space-x-8">
+            <Link
+              to="/student-dashboard"
+              className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
             >
               Student
-            </button>
-            <button
-              className="px-5 py-2.5 rounded-xl border-none text-sm font-medium cursor-pointer bg-gradient-to-br from-teal-50 to-teal-200 text-slate-800"
-              onClick={() => navigate("/login-teacher")}
+            </Link>
+            <Link
+              to="/teacher-dashboard"
+              className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
             >
               Teacher
-            </button>
+            </Link>
+            <Link
+              to="/analytics"
+              className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+            >
+              Analytics
+            </Link>
+            <a
+              href="#"
+              className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+            >
+              About
+            </a>
+          </div>
+          <div className="flex items-center gap-4 relative">
+            <div className="relative group">
+              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:flex items-center gap-1">
+                Log in
+              </button>
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right z-50">
+                <div className="p-1">
+                  <Link
+                    to="/login-student"
+                    className="block px-4 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg"
+                  >
+                    Student Login
+                  </Link>
+                  <Link
+                    to="/login-teacher"
+                    className="block px-4 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg"
+                  >
+                    Teacher Login
+                  </Link>
+                </div>
+              </div>
+            </div>
+            <Link
+              to="/create-account"
+              className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-colors"
+            >
+              Get Started
+            </Link>
           </div>
         </div>
-      )}
+      </div>
     </nav>
   );
 };

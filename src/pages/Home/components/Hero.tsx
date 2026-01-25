@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { LuGraduationCap, LuPresentation } from "react-icons/lu";
 
 const Hero: React.FC = () => {
@@ -30,18 +31,24 @@ const Hero: React.FC = () => {
         </p>
 
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <button className="group relative px-8 py-4 bg-indigo-600 text-white rounded-full font-semibold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]">
+          <Link
+            to="/login-student"
+            className="group relative px-8 py-4 bg-indigo-600 text-white rounded-full font-semibold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]"
+          >
             <span className="flex items-center justify-center gap-2">
               I'm a Student
               <LuGraduationCap className="w-5 h-5 group-hover:rotate-12 transition-transform" />
             </span>
-          </button>
-          <button className="group relative px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-full font-semibold text-lg shadow-sm hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]">
+          </Link>
+          <Link
+            to="/login-teacher"
+            className="group relative px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-full font-semibold text-lg shadow-sm hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]"
+          >
             <span className="flex items-center justify-center gap-2">
               I'm a Teacher
               <LuPresentation className="w-5 h-5 group-hover:scale-110 transition-transform" />
             </span>
-          </button>
+          </Link>
         </div>
 
         {/* Social Proof / Trust */}
