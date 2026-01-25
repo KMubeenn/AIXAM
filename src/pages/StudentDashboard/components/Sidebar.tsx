@@ -13,7 +13,7 @@ const Sidebar: React.FC = () => {
     <aside className="w-full lg:w-64 bg-white border-r border-gray-200 flex-col hidden lg:flex h-screen sticky top-0">
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center justify-center gap-3">
-          <img src={logoImg} alt="AIXAM Logo" className="h-20 w-auto" />
+          <img src={logoImg} alt="AIXAM Logo" className="h-12 w-auto" />
         </div>
       </div>
 

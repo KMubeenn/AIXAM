@@ -11,11 +11,6 @@ const Hero: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold uppercase tracking-wide mb-8">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-          Now with GPT-4 Integration
-        </div>
-
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
           Smarter Exam Preparation.
           <br />

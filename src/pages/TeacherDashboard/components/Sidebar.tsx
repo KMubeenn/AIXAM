@@ -14,7 +14,7 @@ const Sidebar: React.FC = () => {
   return (
     <aside className="w-full lg:w-64 bg-white border-r border-gray-200 flex-shrink-0 hidden lg:flex lg:flex-col h-screen sticky top-0">
       <div className="p-6 flex items-center justify-center gap-3 border-b border-gray-100">
-        <img src={logoImg} alt="AIXAM Logo" className="h-20 w-auto" />
+        <img src={logoImg} alt="AIXAM Logo" className="h-12 w-auto" />
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
