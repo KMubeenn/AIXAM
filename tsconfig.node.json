@@ -3,7 +3,9 @@
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "Node",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "outDir": "dist/config"
   },
-  "include": ["vite.config.js"]
+  "include": ["vite.config.js", "postcss.config.js", "tailwind.config.js", "eslint.config.js"]
 }

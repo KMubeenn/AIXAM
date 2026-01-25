@@ -1,16 +1,16 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import StudentDashboard from "./pages/StudentDashboard";
-import TeacherDashboard from "./pages/TeacherDashboard";
-import AnalyticsDashboard from "./pages/AnalyticsDashboard";
+import StudentDashboard from "./pages/StudentDashboard/StudentDashboard";
+import TeacherDashboard from "./pages/TeacherDashboard/TeacherDashboard";
+import AnalyticsDashboard from "./pages/Analytics/Analytics";
 
 import AuthLayout from "./layouts/AuthLayout";
 
-import Home from "./pages/Home";
+import Home from "./pages/Home/Home";
 
-import LoginT from "./components/LoginT";
-import LoginS from "./components/LoginS";
-import CreateAccount from "./components/CreateAccount";
+import LoginT from "./pages/LoginTeacher/LoginTeacher";
+import LoginS from "./pages/LoginStudent/LoginStudent";
+import CreateAccount from "./pages/CreateAccount/CreateAccount";
 
 const App: React.FC = () => {
   return (

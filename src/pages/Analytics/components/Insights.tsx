@@ -3,7 +3,7 @@ import { LuTrendingUp, LuBookOpen, LuClock } from "react-icons/lu";
 
 const Insights: React.FC = () => {
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-sm p-8 text-white">
+    <div className="bg-blue-600 rounded-xl shadow-sm p-8 text-white">
       <h3 className="text-2xl font-bold mb-2">Actionable Insights</h3>
       <p className="text-blue-100 mb-6">
         Based on your performance data, here are personalized recommendations:

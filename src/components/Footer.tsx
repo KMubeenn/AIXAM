@@ -1,10 +1,5 @@
-import React from "react";
-import {
-  LuBrainCircuit,
-  LuTwitter,
-  LuLinkedin,
-  LuGithub,
-} from "react-icons/lu";
+import logoImg from "../assets/logo/logo_black.png";
+import { LuTwitter, LuLinkedin, LuGithub } from "react-icons/lu";
 
 const Footer: React.FC = () => {
   return (
@@ -13,10 +8,7 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="bg-indigo-600 p-1 rounded-md">
-                <LuBrainCircuit className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-lg font-bold text-slate-900">AIXAM</span>
+              <img src={logoImg} alt="AIXAM Logo" className="h-24 w-auto" />
             </div>
             <p className="text-sm text-slate-500 mb-4">
               Empowering the next generation of learners and educators with

@@ -146,19 +146,10 @@ const About: React.FC = () => {
   return (
     <section
       id="about"
-      className="py-[120px] px-[8%] bg-gradient-to-b from-[#020617] to-[#020617] dark:from-[#020617] dark:to-[#020617] text-slate-50 transition-all duration-400
-      light:from-[#f8fafc] light:to-[#eef2ff] light:text-slate-900
-      bg-[#020617] dark:bg-[#020617] light:bg-gradient-to-b group/section" // Using group to handle light mode if parent has class? No, we use dark: modifier.
-      // Tailwind native dark mode:
-      // Dark mode: bg-[#020617]
-      // Light mode: bg-gradient-to-b from-[#f8fafc] to-[#eef2ff]
+      className="py-[120px] px-[8%] bg-[#f8fafc] transition-all duration-400
+      dark:bg-[#020617] text-slate-900 dark:text-slate-50 group/section"
     >
-      <div className="dark:hidden absolute inset-0 bg-gradient-to-b from-[#f8fafc] to-[#eef2ff] -z-10" />
-      {/* Hack for light mode gradient if dark mode is class based. 
-          Actually, better to use classes:
-          className="... bg-[#f8fafc] dark:bg-[#020617] ..." 
-          But the designs had specific gradients.
-      */}
+      {/* Background gradients removed */}
 
       <div className="relative">
         <TrueFocus sentence="About AIXAM" />
@@ -176,8 +167,8 @@ const About: React.FC = () => {
               key={i}
               className={`p-[30px_22px] rounded-[26px] backdrop-blur-lg border transition-all duration-400
                   hover:-translate-y-3 hover:shadow-[0_30px_70px_rgba(94,234,212,0.25)]
-                  border-black/10 bg-gradient-to-br from-[#99f6e440] to-[#bfdbfe40]
-                  dark:border-white/15 dark:bg-gradient-to-br dark:from-[#0f766e40] dark:to-[#1e3a8a40]
+                  border-black/10 bg-[#f0f9ff]
+                  dark:border-white/15 dark:bg-[#0f172a]
                   ${i === cards.length - 1 && cards.length % 2 !== 0 ? "md:col-span-2 lg:col-span-1 lg:max-w-[320px] lg:mx-auto" : ""}
                   /* Logic for centering last item if alone is tricky in pure grid without knowing exact column count. 
                      Original css used: .cards > .card:last-child { grid-column: 1 / -1; max-width: 320px; ... }

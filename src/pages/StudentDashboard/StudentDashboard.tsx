@@ -1,10 +1,10 @@
 import React from "react";
-import Sidebar from "../components/student-dashboard/Sidebar";
-import Header from "../components/student-dashboard/Header";
-import DashboardStats from "../components/student-dashboard/DashboardStats";
-import RecentMaterials from "../components/student-dashboard/RecentMaterials";
-import FlashcardDecks from "../components/student-dashboard/FlashcardDecks";
-import MockTests from "../components/student-dashboard/MockTests";
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+import DashboardStats from "./components/DashboardStats";
+import RecentMaterials from "./components/RecentMaterials";
+import FlashcardDecks from "./components/FlashcardDecks";
+import MockTests from "./components/MockTests";
 
 const StudentDashboard: React.FC = () => {
   return (
