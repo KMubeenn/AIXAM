@@ -8,7 +8,7 @@ import MockTests from "./components/MockTests";
 
 const StudentDashboard: React.FC = () => {
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50 font-inter text-gray-800">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50 dark:bg-slate-950 font-inter text-gray-800 dark:text-slate-100">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />

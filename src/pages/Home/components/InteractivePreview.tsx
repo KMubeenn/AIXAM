@@ -2,7 +2,7 @@ import { LuCheck } from "react-icons/lu";
 
 const InteractivePreview: React.FC = () => {
   return (
-    <section className="py-24 bg-slate-50 overflow-hidden">
+    <section className="py-24 bg-slate-50 dark:bg-slate-950 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-indigo-900 rounded-[2.5rem] p-8 md:p-16 relative overflow-hidden">
           {/* Decorative circles */}
@@ -39,50 +39,50 @@ const InteractivePreview: React.FC = () => {
 
             {/* Mockup UI Card */}
             <div className="lg:w-1/2 w-full">
-              <div className="bg-white rounded-2xl shadow-2xl p-6 transform rotate-2 hover:rotate-0 transition-transform duration-500">
-                <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 transform rotate-2 hover:rotate-0 transition-transform duration-500">
+                <div className="flex items-center justify-between mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
+                    <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold">
                       AI
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-slate-900">
+                      <div className="text-sm font-bold text-slate-900 dark:text-white">
                         Physics 101: Mechanics
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
                         Generated 2 mins ago
                       </div>
                     </div>
                   </div>
-                  <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">
+                  <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs px-2 py-1 rounded-full font-medium">
                     Ready
                   </span>
                 </div>
                 <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="text-xs text-slate-500 uppercase font-semibold mb-2">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold mb-2">
                       Question 1
                     </div>
-                    <div className="text-sm text-slate-800 font-medium mb-3">
+                    <div className="text-sm text-slate-800 dark:text-slate-200 font-medium mb-3">
                       What is the relationship between force, mass, and
                       acceleration?
                     </div>
                     <div className="space-y-2">
-                      <div className="flex items-center p-2 rounded-lg hover:bg-white cursor-pointer border border-transparent hover:border-indigo-100 transition-colors">
-                        <div className="w-4 h-4 rounded-full border border-slate-300 mr-3"></div>
-                        <span className="text-sm text-slate-600">
+                      <div className="flex items-center p-2 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer border border-transparent hover:border-indigo-100 dark:hover:border-indigo-500/30 transition-colors">
+                        <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600 mr-3"></div>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">
                           F = m / a
                         </span>
                       </div>
-                      <div className="flex items-center p-2 rounded-lg bg-indigo-50 border border-indigo-100 cursor-pointer">
-                        <div className="w-4 h-4 rounded-full border-4 border-indigo-600 mr-3"></div>
-                        <span className="text-sm text-indigo-900 font-medium">
+                      <div className="flex items-center p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-500/30 cursor-pointer">
+                        <div className="w-4 h-4 rounded-full border-4 border-indigo-600 dark:border-indigo-500 mr-3"></div>
+                        <span className="text-sm text-indigo-900 dark:text-indigo-200 font-medium">
                           F = m * a
                         </span>
                       </div>
-                      <div className="flex items-center p-2 rounded-lg hover:bg-white cursor-pointer border border-transparent hover:border-indigo-100 transition-colors">
-                        <div className="w-4 h-4 rounded-full border border-slate-300 mr-3"></div>
-                        <span className="text-sm text-slate-600">
+                      <div className="flex items-center p-2 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer border border-transparent hover:border-indigo-100 dark:hover:border-indigo-500/30 transition-colors">
+                        <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600 mr-3"></div>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">
                           F = a / m
                         </span>
                       </div>

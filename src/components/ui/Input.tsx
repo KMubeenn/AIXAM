@@ -16,7 +16,7 @@ const Input: React.FC<InputProps> = ({
         <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
       )}
       <input
-        className={`w-full h-[52px] px-[48px] rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-[1rem] outline-none focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/10 placeholder-slate-400 transition-all ${className}`}
+        className={`w-full h-[52px] px-[48px] rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-[1rem] outline-none focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/10 dark:focus:ring-indigo-500/20 placeholder-slate-400 dark:placeholder-slate-500 transition-all ${className}`}
         {...props}
       />
     </div>
