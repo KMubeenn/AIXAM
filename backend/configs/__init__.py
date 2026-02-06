@@ -1,1 +1,0 @@
-# Django ORM configuration package
