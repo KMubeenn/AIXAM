@@ -1,4 +1,4 @@
-# Serializers module
+# Serializers module.
 from api.serializers.chat import (
     MessageSerializer,
     SessionMemorySerializer,
