@@ -1,0 +1,38 @@
+{
+    "primary": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash"
+    },
+    "fallback": [
+        {
+            "provider": "groq",
+            "model": "llama-3.3-70b-versatile",
+            "description": "Best overall - 70B params, good tool calling"
+        },
+        {
+            "provider": "groq",
+            "model": "llama-3.1-8b-instant",
+            "description": "Fast with reliable tool calling support"
+        },
+        {
+            "provider": "groq",
+            "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "description": "Llama 4 Maverick - 128k context"
+        },
+        {
+            "provider": "groq",
+            "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+            "description": "Llama 4 Scout - 128k context"
+        },
+        {
+            "provider": "groq",
+            "model": "qwen/qwen3-32b",
+            "description": "Qwen3 32B - may have tool format issues"
+        },
+        {
+            "provider": "groq",
+            "model": "moonshotai/kimi-k2-instruct-0905",
+            "description": "Kimi K2 - experimental"
+        }
+    ]
+}
