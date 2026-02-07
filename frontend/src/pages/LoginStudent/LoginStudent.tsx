@@ -6,10 +6,43 @@ import logoWhiteImg from "../../assets/logo/logo_white.png";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import { AuthService } from "../../services/auth.service";
 
 const LoginS: React.FC = () => {
   const [showPass, setShowPass] = useState<boolean>(false);
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await AuthService.login(
+        formData.email,
+        formData.password,
+      );
+      const user = response.user;
+
+      if (user.role === "student") {
+        navigate("/student-dashboard");
+      } else {
+        // Logged in successfully but wrong portal
+        AuthService.logout(); // Clear session
+        setError("This account is for Teachers. Please use the Teacher Login.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.error || err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex-1 w-full relative flex justify-center items-center py-12 px-4 overflow-hidden">
@@ -33,13 +66,28 @@ const LoginS: React.FC = () => {
           </span>
         </div>
 
-        <Input icon={FiMail} placeholder="Email" />
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-600 rounded-lg text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        <Input
+          icon={FiMail}
+          placeholder="Email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+        />
 
         <div className="relative w-[85%] mb-[18px]">
           <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type={showPass ? "text" : "password"}
             placeholder="Password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
             className="w-full h-[52px] px-[48px] rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-[0.95rem] outline-none focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/10 dark:focus:ring-indigo-500/20 placeholder-slate-400 dark:placeholder-slate-500 transition-all"
           />
           <div
@@ -50,8 +98,13 @@ const LoginS: React.FC = () => {
           </div>
         </div>
 
-        <Button fullWidth className="mt-2.5">
-          Login
+        <Button
+          fullWidth
+          className="mt-2.5"
+          onClick={handleLogin}
+          disabled={loading}
+        >
+          {loading ? "Logging in..." : "Login"}
         </Button>
 
         <div className="mt-5 text-center text-[0.9rem] text-slate-500 dark:text-slate-400">

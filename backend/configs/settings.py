@@ -2,7 +2,7 @@ import os
 
 # Required for Django
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key-change-in-production")
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+DEBUG = os.getenv("DEBUG", "True").lower() == "false"
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "3.239.50.12", "100.49.176.178", "*"]
 
 # Database configuration - Supabase PostgreSQL
@@ -25,8 +25,10 @@ DATABASES = {
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
-    "database",  # Your database models app (must be after auth)
-    "api",  # REST API app
+    "apps.users",     # User management
+    "apps.chat",      # Chat and Voice agents
+    "apps.analytics", # Metrics and usage
+    "apps.core",      # Core utilites and middleware
 ]
 
 # URL Configuration
@@ -37,12 +39,12 @@ ASGI_APPLICATION = "configs.asgi.application"
 
 # Middleware
 MIDDLEWARE = [
-    "api.middleware.cors.CORSMiddleware",
-    "api.middleware.metrics.RequestMetricsMiddleware",
+    "apps.core.middleware.cors.CORSMiddleware",
+    "apps.core.middleware.metrics.RequestMetricsMiddleware",
 ]
 
 # Custom User model - MUST be set before first migration
-AUTH_USER_MODEL = "database.User"
+AUTH_USER_MODEL = "users.User"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
