@@ -15,6 +15,33 @@ const LoginT: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    const checkSession = async () => {
+      const token = AuthService.getToken();
+      if (!token) return;
+
+      try {
+        const data = await AuthService.getProfile();
+        const user = data.user;
+
+        if (user && user.role === "teacher") {
+          navigate("/teacher-dashboard");
+        } else if (user && user.role === "student") {
+          // Wrong portal, clear session
+          AuthService.logout();
+          setError(
+            "This account is for Students. Please use the Student Login.",
+          );
+        }
+      } catch (err) {
+        // Invalid token
+        AuthService.logout();
+      }
+    };
+
+    checkSession();
+  }, [navigate]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
