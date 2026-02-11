@@ -32,4 +32,5 @@ dependencies = [
     "websockets>=15.0.1",
     "psycopg[binary]>=3.3.2",
     "dotenv>=0.9.9",
+    "langgraph>=1.0.8",
 ]

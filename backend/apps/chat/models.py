@@ -21,6 +21,7 @@ class ChatSession(models.Model):
         ('study_material', 'Study Material'),
         ('assignment', 'Class Assignment'),
         ('flashcard', 'Flashcard Review'),
+        ('mock_test', 'Mock Test'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
