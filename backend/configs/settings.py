@@ -20,9 +20,20 @@ DATABASES = {
     }
 }
 
+CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://lexa-rho.vercel.app",
+        "http://3.239.50.12",
+        "http://100.49.176.178",
+]
+
 # Apps that will use Django ORM
 # NOTE: auth must come BEFORE the app with custom User model
 INSTALLED_APPS = [
+    "corsheaders",
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "apps.users",     # User management
@@ -40,7 +51,7 @@ ASGI_APPLICATION = "configs.asgi.application"
 
 # Middleware
 MIDDLEWARE = [
-    "apps.core.middleware.cors.CORSMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "apps.core.middleware.metrics.RequestMetricsMiddleware",
 ]
 
@@ -53,3 +64,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Use UTC timezone
 USE_TZ = True
 TIME_ZONE = "UTC"
+
+CORS_ALLOW_CREDENTIALS = True
+
+

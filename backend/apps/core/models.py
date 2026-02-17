@@ -256,7 +256,7 @@ class Submission(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     (Q(assignment__isnull=False) & Q(quiz__isnull=True)) |
                     (Q(assignment__isnull=True) & Q(quiz__isnull=False))
                 ),
