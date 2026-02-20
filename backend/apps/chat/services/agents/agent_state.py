@@ -1,9 +1,12 @@
-from langchain.messages import AnyMessage
-from typing import TypedDict , Annotated
+from langchain.messages import HumanMessage,AIMessage
+from typing import TypedDict , Annotated , Union
 import operator
 
 class AgentState(TypedDict , total=False):
-    messages : Annotated[list[AnyMessage],operator.add]
+    system_prompt : str
+    rag_context : str
+    files_input : str
+    messages : list[Union(HumanMessage,AIMessage)]
     llm_calls : int 
     flashcards : dict
     assignment : dict
