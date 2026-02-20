@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     "apps.chat",      # Chat and Voice agents
     "apps.analytics", # Metrics and usage
     "apps.core",      # Core utilites and middleware
-    "apps.agent",     # Agent management
+
 ]
 
 # URL Configuration
