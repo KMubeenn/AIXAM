@@ -6,7 +6,7 @@ class AgentState(TypedDict , total=False):
     system_prompt : str
     rag_context : str
     files_input : str
-    messages : list[Union(HumanMessage,AIMessage)]
+    messages : list[Union[HumanMessage,AIMessage]]
     llm_calls : int 
     flashcards : dict
     assignment : dict

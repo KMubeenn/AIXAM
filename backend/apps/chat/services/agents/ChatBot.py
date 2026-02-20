@@ -23,9 +23,11 @@ class Agent():
         self.llm=init_chat_model("groq:llama-3.1-8b-instant",temperature=self.temperature)
         self.agent=None
 
-    def conversation(self ,state : AgentState):
+    def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
-        state['messages'].append(response)
+        state['messages'].append(type(response)(content=response.content))
+        state['llm_calls']=state.get('llm_calls',0)+1
+        print(response)
         return state
 
     def agent_builder(self):
@@ -45,8 +47,8 @@ if __name__=="__main__":
     print("running the agent")
     agent=Agent()
     agent=agent.agent_builder()
-    state=agent.invoke({"messages":[HumanMessage(content="tell me about yourself")]})
-    print(state["messages"][-1].content)
+    state=agent.invoke({"messages":[HumanMessage(content="tell me about yourself in one line ")]})
+    print(state)
     print("agent ran successfully")
 
 
