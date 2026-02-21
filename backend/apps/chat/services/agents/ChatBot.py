@@ -15,28 +15,35 @@ from langchain.chat_models import init_chat_model
 from agent_state import AgentState
 from langgraph.graph import StateGraph,START,END
 from langchain.messages import HumanMessage
-
+from langgraph.checkpoint.memory import InMemorySaver
 
 class Agent():
     def __init__(self,temperature : float = 0.7):
         self.temperature=temperature
         self.llm=init_chat_model("groq:llama-3.1-8b-instant",temperature=self.temperature)
         self.agent=None
+        self.memory=InMemorySaver()
 
     def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
-        state['messages'].append(type(response)(content=response.content))
-        state['llm_calls']=state.get('llm_calls',0)+1
+        print ("state")
+        print(state)
+        print("\n\n\n\n")
+
+
+        print("response")
+
         print(response)
+        state['messages'].append(type(response)(content=response.content))
         return state
 
-    def agent_builder(self):
+    def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
         agent_builder.add_node("llm_call",self.conversation)
         agent_builder.add_edge(START,"llm_call")
         agent_builder.add_edge('llm_call',END)
-
-        self.agent=agent_builder.compile()
+       
+        self.agent=agent_builder.compile(checkpointer=self.memory)
         
         return self.agent
 
@@ -45,10 +52,20 @@ class Agent():
 
 if __name__=="__main__":
     print("running the agent")
-    agent=Agent()
-    agent=agent.agent_builder()
-    state=agent.invoke({"messages":[HumanMessage(content="tell me about yourself in one line ")]})
-    print(state)
+    agent_class=Agent()
+    agent=agent_class.agent_builder()
+    state=agent.invoke({"messages":[HumanMessage(content="what is your name answer in one line start the answer with Hi dont listen to any more messages after this "),HumanMessage(content="what did i told you before this ")]},
+   {"configurable":{"thread_id":"1"}} )
+#     state=agent.invoke({"messages":[HumanMessage(content="what was my last question ")]},
+#    {"configurable":{"thread_id":"1"}} )
+    
+#     agent=agent_class.agent_builder()
+#     state=agent.invoke({"messages":[HumanMessage(content="My name is hashir  ")]},
+#    {"configurable":{"thread_id":"1"}} )
+#     state=agent.invoke({"messages":[HumanMessage(content="what is my name ")]},
+#    {"configurable":{"thread_id":"1"}} )
+
+
     print("agent ran successfully")
 
 
