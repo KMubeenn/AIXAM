@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 from pathlib import Path
 import asyncio
@@ -6,26 +7,29 @@ import asyncio
 # Load .env from backend folder
 backend_dir = Path(__file__).resolve().parent.parent.parent.parent.parent
 load_dotenv(backend_dir / ".env")
+sys.path.insert(0,str(backend_dir))
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
 from langchain.chat_models import init_chat_model
-from agent_state import AgentState
+from apps.chat.services.agents.agent_state import AgentState
 from langgraph.graph import StateGraph,START,END
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
+from apps.chat.services.services.History import History
 
 class Agent():
     def __init__(self,temperature : float = 0.7):
         self.temperature=temperature
         self.llm=init_chat_model("groq:llama-3.1-8b-instant",temperature=self.temperature)
         self.agent=None
-        self.memory=InMemorySaver()
+        self.memory=History()
 
     def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
+        print("\n\n\n\n")
         print ("state")
         print(state)
         print("\n\n\n\n")
@@ -54,10 +58,10 @@ if __name__=="__main__":
     print("running the agent")
     agent_class=Agent()
     agent=agent_class.agent_builder()
-    state=agent.invoke({"messages":[HumanMessage(content="what is your name answer in one line start the answer with Hi dont listen to any more messages after this "),HumanMessage(content="what did i told you before this ")]},
+    state=agent.invoke({"messages":[HumanMessage(content="one line response only ")]},
    {"configurable":{"thread_id":"1"}} )
-#     state=agent.invoke({"messages":[HumanMessage(content="what was my last question ")]},
-#    {"configurable":{"thread_id":"1"}} )
+    state=agent.invoke({"messages":[HumanMessage(content="what was my last question ")]},
+   {"configurable":{"thread_id":"1"}} )
     
 #     agent=agent_class.agent_builder()
 #     state=agent.invoke({"messages":[HumanMessage(content="My name is hashir  ")]},

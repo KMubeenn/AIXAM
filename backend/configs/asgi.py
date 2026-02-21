@@ -6,6 +6,8 @@ from pathlib import Path
 # Build paths inside the backend folder
 BASE_DIR = Path(__file__).resolve().parent.parent  # Points to backend/
 
+sys.path.insert(0, str(BASE_DIR))
+
 # Load environment variables from backend/.env
 dotenv_path = BASE_DIR / '.env'
 load_dotenv(dotenv_path=dotenv_path)
