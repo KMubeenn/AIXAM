@@ -40,7 +40,7 @@ class Agent():
 
         # print(response)
         # state['messages'].append(type(response)(content=response.content))
-        return {"messages":type(response)(content=response.content)}
+        return {"messages":type(response)(content=response.content),'final_result':True}
 
 
 
@@ -61,7 +61,8 @@ class Agent():
             stream_mode='messages'):
             message,meta_data=chunk
             if meta_data.get("langgraph_node") == "llm_call" and message.content:
-                print(message.content, end="", flush=True)
+                # print(message.content, end="", flush=True)
+                pass
 
         
 
@@ -72,7 +73,7 @@ class Agent():
 if __name__=="__main__":
     print("running the agent")
     agent_class=Agent()
-    asyncio.run(agent_class.astream("write me an essay", 1))
+    asyncio.run(agent_class.astream("write me an essay in 2 lines", 1))
 
 
     print("agent ran successfully")

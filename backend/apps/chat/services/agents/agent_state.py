@@ -14,5 +14,6 @@ class AgentState(TypedDict , total=False):
     assignment : dict
     grades : dict
     classroom : dict
+    final_result : bool
 
 

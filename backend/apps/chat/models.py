@@ -16,13 +16,6 @@ class ChatSession(models.Model):
     Represents a chat conversation session for a user.
     Each user can have up to MAX_SESSIONS_PER_USER active sessions.
     """
-    CONTEXT_TYPE_CHOICES = [
-        ('general', 'General'),
-        ('study_material', 'Study Material'),
-        ('assignment', 'Class Assignment'),
-        ('flashcard', 'Flashcard Review'),
-        ('mock_test', 'Mock Test'),
-    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
@@ -31,7 +24,6 @@ class ChatSession(models.Model):
         related_name='chat_sessions'
     )
     title = models.CharField(max_length=255, default='New Chat')
-    context_type = models.CharField(max_length=20, choices=CONTEXT_TYPE_CHOICES, default='general')
     context_id = models.UUIDField(null=True, blank=True, help_text="ID of the related object (e.g., StudyMaterial ID, Assignment ID)")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

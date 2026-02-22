@@ -14,7 +14,7 @@ class History(BaseCheckpointSaver):
         Loads the saved checkpoint for this thread_id.
         Return None if no history exists (fresh conversation).
         """
-
+        print("config\n\n\n",config)
         thread_id=config['configurable']['thread_id']
         if thread_id not in self.storage:
             return None
@@ -44,7 +44,10 @@ class History(BaseCheckpointSaver):
 
         checkpoint['step']=metadata.get('step',0)
         self.storage[thread_id]=checkpoint
-        
+        print("checkpoint\n\n\n",checkpoint)
+
+        if checkpoint.get("channel_values",{}).get("final_result",0):
+            print("final_result\n\n\n",checkpoint['channel_values']['final_result'])
         return config
 
     async def aput_writes(
