@@ -3,6 +3,7 @@ import sys
 from dotenv import load_dotenv
 from pathlib import Path
 import asyncio
+import asyncio
 
 # Load .env from backend folder
 backend_dir = Path(__file__).resolve().parent.parent.parent.parent.parent
@@ -29,27 +30,41 @@ class Agent():
 
     def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
-        print("\n\n\n\n")
-        print ("state")
-        print(state)
-        print("\n\n\n\n")
+        # print("\n\n\n\n")
+        # print ("state")
+        # print(state)
+        # print("\n\n\n\n")
 
 
-        print("response")
+        # print("response")
 
-        print(response)
-        state['messages'].append(type(response)(content=response.content))
-        return state
+        # print(response)
+        # state['messages'].append(type(response)(content=response.content))
+        return {"messages":type(response)(content=response.content)}
+
+
 
     def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
         agent_builder.add_node("llm_call",self.conversation)
         agent_builder.add_edge(START,"llm_call")
-        agent_builder.add_edge('llm_call',END)
+        agent_builder.add_edge("llm_call",END)
        
         self.agent=agent_builder.compile(checkpointer=self.memory)
         
         return self.agent
+
+    async def astream(self,input:str,id:int):
+        self.agent_builder()
+        async for chunk in self.agent.astream({'messages':input},
+            {'configurable':{'thread_id':id}},
+            stream_mode='messages'):
+            message,meta_data=chunk
+            if meta_data.get("langgraph_node") == "llm_call" and message.content:
+                print(message.content, end="", flush=True)
+
+        
+
 
 
 
@@ -57,17 +72,7 @@ class Agent():
 if __name__=="__main__":
     print("running the agent")
     agent_class=Agent()
-    agent=agent_class.agent_builder()
-    state=agent.invoke({"messages":[HumanMessage(content="one line response only ")]},
-   {"configurable":{"thread_id":"1"}} )
-    state=agent.invoke({"messages":[HumanMessage(content="what was my last question ")]},
-   {"configurable":{"thread_id":"1"}} )
-    
-#     agent=agent_class.agent_builder()
-#     state=agent.invoke({"messages":[HumanMessage(content="My name is hashir  ")]},
-#    {"configurable":{"thread_id":"1"}} )
-#     state=agent.invoke({"messages":[HumanMessage(content="what is my name ")]},
-#    {"configurable":{"thread_id":"1"}} )
+    asyncio.run(agent_class.astream("write me an essay", 1))
 
 
     print("agent ran successfully")

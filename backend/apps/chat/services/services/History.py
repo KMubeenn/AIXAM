@@ -8,7 +8,7 @@ class History(BaseCheckpointSaver):
         super().__init__()
         self.storage={}
 
-    def get_tuple(self,config:dict)->Optional[CheckpointTuple]:
+    async def aget_tuple(self,config:dict)->Optional[CheckpointTuple]:
         """
         Called automatically by LangGraph before every invoke.
         Loads the saved checkpoint for this thread_id.
@@ -19,7 +19,7 @@ class History(BaseCheckpointSaver):
         if thread_id not in self.storage:
             return None
 
-
+        saved=self.storage[thread_id]
         checkpoint=CheckpointTuple(
             config=config,
             checkpoint=self.storage[thread_id],
@@ -33,7 +33,7 @@ class History(BaseCheckpointSaver):
         )
         return checkpoint
 
-    def put(self,config:dict,checkpoint:Checkpoint , metadata:CheckpointMetadata,new_versions)->dict:
+    async def aput(self,config:dict,checkpoint:Checkpoint , metadata:CheckpointMetadata,new_versions)->dict:
         """
         called after every node is executed automatically
         by langchain
@@ -47,7 +47,7 @@ class History(BaseCheckpointSaver):
         
         return config
 
-    def put_writes(
+    async def aput_writes(
         self,
         config: RunnableConfig,
         writes: Sequence[tuple[str, Any]],
