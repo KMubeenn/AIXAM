@@ -24,7 +24,6 @@ class ChatSession(models.Model):
         related_name='chat_sessions'
     )
     title = models.CharField(max_length=255, default='New Chat')
-    context_id = models.UUIDField(null=True, blank=True, help_text="ID of the related object (e.g., StudyMaterial ID, Assignment ID)")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -54,6 +53,12 @@ class ChatSession(models.Model):
         """Check if session can accept more messages (20 pairs = 40 messages)."""
         return self.message_count < max_messages
 
+    def increment_message_count(self,message_count=2):
+        self.message_count+=message_count
+        self.save(update_fields=['message_count','updated_at'])
+    
+
+
 
 class Message(models.Model):
     """
@@ -73,7 +78,6 @@ class Message(models.Model):
     )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
     content = models.TextField()
-    sources = models.JSONField(default=list, blank=True, help_text="List of source citations for RAG responses")
     timestamp = models.DateTimeField(auto_now_add=True)
     sequence_number = models.PositiveIntegerField()
     

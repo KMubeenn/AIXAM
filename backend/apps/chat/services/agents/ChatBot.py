@@ -25,7 +25,7 @@ class Agent():
     def __init__(self,temperature : float = 0.7):
         self.temperature=temperature
         self.llm=init_chat_model("groq:llama-3.1-8b-instant",temperature=self.temperature)
-        self.agent=None
+        self.agent=self.agent_builder()
         self.memory=History()
 
     def conversation(self ,state : AgentState) ->AgentState:
@@ -50,19 +50,18 @@ class Agent():
         agent_builder.add_edge(START,"llm_call")
         agent_builder.add_edge("llm_call",END)
        
-        self.agent=agent_builder.compile(checkpointer=self.memory)
+        agent=agent_builder.compile(checkpointer=self.memory)
         
-        return self.agent
+        return agent
 
     async def astream(self,input:str,id:int):
-        self.agent_builder()
         async for chunk in self.agent.astream({'messages':input},
             {'configurable':{'thread_id':id}},
             stream_mode='messages'):
             message,meta_data=chunk
             if meta_data.get("langgraph_node") == "llm_call" and message.content:
-                # print(message.content, end="", flush=True)
-                pass
+                yield message.content
+            
 
         
 

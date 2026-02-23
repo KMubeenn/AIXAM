@@ -1,4 +1,62 @@
 
+from apps.chat.models import ChatSession,Message,SessionMemory
+
+
+class ChatPersistenceService:
+
+    @staticmethod
+    def create_session(user_id,title:str = "New chat"):
+        session=ChatSession.objects.create(user_id=user_id,title=title)
+        return session.id
+
+    @staticmethod
+    def delete_session(session_id):
+        ChatSession.objects.get(id=session_id).delete()
+        return "session deleted successfully"
+
+    @staticmethod
+    def update_messages(session_id,role,content):
+      message = Message.objects.create(session_id=session_id,role=role,content=content)
+      if role=='assistant':
+        session=ChatSession.objects.get(id=session_id)
+        session.increment_message_count()
+
+    @staticmethod
+    def update_session_memory(session_id,human_message,ai_message):
+        memory_state=[
+            {"type":'HumanMessage','content':human_message},
+            {'type':'AIMessage','content':ai_message}
+        ]
+        session=ChatSession.objects.get(id=session_id)
+        session_memory=SessionMemory.objects.get_or_create(session=session_id)
+        if session.message_count>40:
+            messages=session_memory.memory_state
+            messages.extend(memory_state)
+            session_memory.memory_state=messages[2:]
+        else:
+            session_memory.memory_state.extend(memory_state)
+
+        session_memory.save(update_fields=['memory_state','updated_at'])
+
+
+    @staticmethod 
+    def get_title(session_id):
+        session=ChatSession.objects.get(id=session_id)
+        return session.title
+
+    @staticmethod
+    def set_title(session_id,message):
+        words=message.split()
+        title=' '.join(words[:5])
+        session=ChatSession.objects.get(id=session_id)
+        session.title=title
+        seesion.save(update_fields=['title','updated_at'])
+
+
+
+    
+    
+    
 
 
 
@@ -6,49 +64,7 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
 
 
 
@@ -303,6 +319,7 @@
 #         if not ChatSession.can_create_session(user, cls.MAX_SESSIONS_PER_USER):
 #             print(f"[ChatPersistence] User {user.username} has reached max sessions")
 #             return None
+        
         
 #         try:
 #             session = ChatSession.objects.create(user=user, title=title)
