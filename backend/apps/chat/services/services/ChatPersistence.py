@@ -1,6 +1,8 @@
 
 from apps.chat.models import ChatSession,Message,SessionMemory
 
+from langchain.messages import HumanMessage,AIMessage
+
 
 class ChatPersistenceService:
 
@@ -17,9 +19,6 @@ class ChatPersistenceService:
     @staticmethod
     def update_messages(session_id,role,content):
       message = Message.objects.create(session_id=session_id,role=role,content=content)
-      if role=='assistant':
-        session=ChatSession.objects.get(id=session_id)
-        session.increment_message_count()
 
     @staticmethod
     def update_session_memory(session_id,human_message,ai_message):
@@ -28,7 +27,7 @@ class ChatPersistenceService:
             {'type':'AIMessage','content':ai_message}
         ]
         session=ChatSession.objects.get(id=session_id)
-        session_memory=SessionMemory.objects.get_or_create(session=session_id)
+        session_memory,created=SessionMemory.objects.get_or_create(session=session)
         if session.message_count>40:
             messages=session_memory.memory_state
             messages.extend(memory_state)
@@ -36,7 +35,22 @@ class ChatPersistenceService:
         else:
             session_memory.memory_state.extend(memory_state)
 
-        session_memory.save(update_fields=['memory_state','updated_at'])
+        session_memory.save(update_fields=['memory_state','last_updated'])
+
+    @staticmethod
+    def get_session_memory(session_id):
+        session=ChatSession.objects.get(id=session_id)
+        if not hasattr(session,'memory'):
+            return []
+        memory=session.memory
+        messages=memory.memory_state
+        messages_buffer=[]
+        for msg in messages:
+            if msg['type']=='HumanMessage':
+                messages_buffer.append(HumanMessage(content=msg['content']))
+            else:
+                messages_buffer.append(AIMessage(content=msg['content']))
+        return messages_buffer
 
 
     @staticmethod 
@@ -50,7 +64,7 @@ class ChatPersistenceService:
         title=' '.join(words[:5])
         session=ChatSession.objects.get(id=session_id)
         session.title=title
-        seesion.save(update_fields=['title','updated_at'])
+        session.save(update_fields=['title','updated_at'])
 
 
 

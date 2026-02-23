@@ -5,6 +5,7 @@ from pathlib import Path
 import asyncio
 import asyncio
 
+
 # Load .env from backend folder
 backend_dir = Path(__file__).resolve().parent.parent.parent.parent.parent
 load_dotenv(backend_dir / ".env")
@@ -25,8 +26,8 @@ class Agent():
     def __init__(self,temperature : float = 0.7):
         self.temperature=temperature
         self.llm=init_chat_model("groq:llama-3.1-8b-instant",temperature=self.temperature)
-        self.agent=self.agent_builder()
         self.memory=History()
+        self.agent=self.agent_builder()
 
     def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
@@ -54,8 +55,8 @@ class Agent():
         
         return agent
 
-    async def astream(self,input:str,id:int):
-        async for chunk in self.agent.astream({'messages':input},
+    def stream(self,input:list,id:int):
+        for chunk in self.agent.stream({'messages':input},
             {'configurable':{'thread_id':id}},
             stream_mode='messages'):
             message,meta_data=chunk

@@ -1,24 +1,25 @@
 
 import asyncio
-from apps.chat.services.agents.ChatBot import Agent
+
 from apps.chat.services.services.ChatPersistence import ChatPersistenceService
 
-def generate_response_with_persistence(session_id,message):
+
+
+def generate_response_with_persistence(chat_agent,session_id,message):
     chat_persistence=ChatPersistenceService()
     chat_persistence.update_messages(session_id=session_id,role="user",content=message)
-    agent=Agent()
+    agent=chat_agent
     full_response=[]
     if chat_persistence.get_title(session_id=session_id)=='New Chat':
         chat_persistence.set_title(session_id=session_id,message=message)
 
     for token in agent.astream(input=message,id=session_id):
-        response.append(token)
+        full_response.append(token)
         yield token
 
     response=''.join(full_response)
     chat_persistence.update_messages(session_id=session_id,role='assistant',content=response)
     chat_persistence.update_session_memory(session_id=session_id,human_message=message,ai_message=response)
-
 
 
 
