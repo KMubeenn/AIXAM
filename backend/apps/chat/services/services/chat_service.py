@@ -4,22 +4,31 @@ import asyncio
 from apps.chat.services.services.ChatPersistence import ChatPersistenceService
 
 
+AVG_CHARS_PER_TOKEN=4
 
-def generate_response_with_persistence(chat_agent,session_id,message):
+def estimate_tokens(input:str)->int:
+    """ used to get an estimate of tokens in text"""
+    return max(1,len(input))//AVG_CHARS_PER_TOKEN
+
+
+
+
+
+async def generate_response_with_persistence(chat_agent,session_id,message):
     chat_persistence=ChatPersistenceService()
-    chat_persistence.update_messages(session_id=session_id,role="user",content=message)
+    await chat_persistence.update_messages(session_id=session_id,role="user",content=message)
     agent=chat_agent
     full_response=[]
-    if chat_persistence.get_title(session_id=session_id)=='New Chat':
-        chat_persistence.set_title(session_id=session_id,message=message)
+    if await chat_persistence.get_title(session_id=session_id)=='New Chat':
+        await chat_persistence.set_title(session_id=session_id,message=message)
 
-    for token in agent.astream(input=message,id=session_id):
+    async for token in agent.astream(input=message,id=session_id):
         full_response.append(token)
         yield token
 
     response=''.join(full_response)
-    chat_persistence.update_messages(session_id=session_id,role='assistant',content=response)
-    chat_persistence.update_session_memory(session_id=session_id,human_message=message,ai_message=response)
+    await chat_persistence.update_messages(session_id=session_id,role='assistant',content=response)
+    await chat_persistence.update_session_memory(session_id=session_id,human_message=message,ai_message=response)
 
 
 

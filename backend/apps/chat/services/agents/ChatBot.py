@@ -31,19 +31,7 @@ class Agent():
 
     def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
-        # print("\n\n\n\n")
-        # print ("state")
-        # print(state)
-        # print("\n\n\n\n")
-
-
-        # print("response")
-
-        # print(response)
-        # state['messages'].append(type(response)(content=response.content))
         return {"messages":type(response)(content=response.content),'final_result':True}
-
-
 
     def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
@@ -55,20 +43,14 @@ class Agent():
         
         return agent
 
-    def stream(self,input:list,id:int):
-        for chunk in self.agent.stream({'messages':input},
+    async def astream(self,input:list,id:int):
+        async for chunk in self.agent.astream({'messages':input},
             {'configurable':{'thread_id':id}},
             stream_mode='messages'):
             message,meta_data=chunk
             if meta_data.get("langgraph_node") == "llm_call" and message.content:
                 yield message.content
             
-
-        
-
-
-
-
 
 if __name__=="__main__":
     print("running the agent")

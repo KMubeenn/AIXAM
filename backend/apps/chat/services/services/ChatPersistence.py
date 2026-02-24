@@ -3,47 +3,65 @@ from apps.chat.models import ChatSession,Message,SessionMemory
 
 from langchain.messages import HumanMessage,AIMessage
 
+from asgiref.sync import sync_to_async
+
 
 class ChatPersistenceService:
+    MAX_MESSAGES_PER_SESSION=40
 
     @staticmethod
-    def create_session(user_id,title:str = "New chat"):
-        session=ChatSession.objects.create(user_id=user_id,title=title)
-        return session.id
+    async def create_session(user_id,title:str = "New chat"):
+        chat_session=await sync_to_async(ChatSession.objects.create)(user_id=user_id,title=title)
+        session_memory=await sync_to_async(SessionMemory.objects.create)(session=chat_session)
+        return chat_session.id
 
     @staticmethod
-    def delete_session(session_id):
-        ChatSession.objects.get(id=session_id).delete()
+    async def delete_session(session_id):
+        session=await sync_to_async(ChatSession.objects.get)(id=session_id)
+        await sync_to_async(session.delete)()
+
         return "session deleted successfully"
 
     @staticmethod
-    def update_messages(session_id,role,content):
-      message = Message.objects.create(session_id=session_id,role=role,content=content)
+    async def get_user_sessions(user_id:int):
+        chat_sessions=await sync_to_async(list)(ChatSession.objects.filter(user_id=user_id))
+        return chat_sessions
 
     @staticmethod
-    def update_session_memory(session_id,human_message,ai_message):
+    async def get_session_messages(session_id):
+        session=await sync_to_async(ChatSession.objects.get)(id=session_id)
+        messages=await sync_to_async(list)(session.messages.all())
+        return messages
+
+    @staticmethod
+    async def update_messages(session_id,role,content):
+        await sync_to_async(Message.objects.create)(session_id=session_id,role=role,content=content)
+
+    @classmethod
+    async def update_session_memory(cls,session_id,human_message,ai_message):
         memory_state=[
             {"type":'HumanMessage','content':human_message},
             {'type':'AIMessage','content':ai_message}
         ]
-        session=ChatSession.objects.get(id=session_id)
-        session_memory,created=SessionMemory.objects.get_or_create(session=session)
-        if session.message_count>40:
+        session=await sync_to_async(ChatSession.objects.get)(id=session_id)
+        session_memory,created=await sync_to_async(SessionMemory.objects.get_or_create)(session=session)
+        if len(session_memory.memory_state)>cls.MAX_MESSAGES_PER_SESSION:
             messages=session_memory.memory_state
             messages.extend(memory_state)
             session_memory.memory_state=messages[2:]
         else:
             session_memory.memory_state.extend(memory_state)
 
-        session_memory.save(update_fields=['memory_state','last_updated'])
+        await sync_to_async(session_memory.save)(update_fields=['memory_state','last_updated'])
+    
 
     @staticmethod
-    def get_session_memory(session_id):
-        session=ChatSession.objects.get(id=session_id)
-        if not hasattr(session,'memory'):
+    async def get_session_memory(session_id):
+        session=await sync_to_async(ChatSession.objects.select_related('memory').get)(id=session_id)
+        if  getattr(session,'memory',None) is None:
             return []
         memory=session.memory
-        messages=memory.memory_state
+        messages=list(memory.memory_state or [])
         messages_buffer=[]
         for msg in messages:
             if msg['type']=='HumanMessage':
@@ -54,17 +72,17 @@ class ChatPersistenceService:
 
 
     @staticmethod 
-    def get_title(session_id):
-        session=ChatSession.objects.get(id=session_id)
+    async def get_title(session_id):
+        session=await sync_to_async(ChatSession.objects.get)(id=session_id)
         return session.title
 
     @staticmethod
-    def set_title(session_id,message):
+    async def set_title(session_id,message):
         words=message.split()
         title=' '.join(words[:5])
-        session=ChatSession.objects.get(id=session_id)
+        session=await sync_to_async(ChatSession.objects.get)(id=session_id)
         session.title=title
-        session.save(update_fields=['title','updated_at'])
+        await sync_to_async(session.save)(update_fields=['title','updated_at'])
 
 
 
