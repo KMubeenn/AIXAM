@@ -38,7 +38,6 @@ class Agent():
         agent_builder.add_node("llm_call",self.conversation)
         agent_builder.add_edge(START,"llm_call")
         agent_builder.add_edge("llm_call",END)
-       
         agent=agent_builder.compile(checkpointer=self.memory)
         
         return agent

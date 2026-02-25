@@ -7,6 +7,7 @@ import hashlib
 from datetime import datetime, timedelta
 from django.core import signing
 from django.conf import settings
+from asgiref.sync import sync_to_async
 
 
 # Token expiry time (7 days)

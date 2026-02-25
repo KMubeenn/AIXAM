@@ -4,16 +4,31 @@ from apps.chat.models import ChatSession,Message,SessionMemory
 from langchain.messages import HumanMessage,AIMessage
 
 from asgiref.sync import sync_to_async
+ 
+from django.db import transaction
 
 
 class ChatPersistenceService:
     MAX_MESSAGES_PER_SESSION=40
 
+
+    @staticmethod
+    @sync_to_async
+    def _create_session_sync(user_id,title):
+        with transaction.atomic():
+            chat_session=ChatSession.objects.create(user_id=user_id,title=title)
+            SessionMemory.objects.create(session=chat_session)
+            return chat_session.id
+
+
     @staticmethod
     async def create_session(user_id,title:str = "New chat"):
-        chat_session=await sync_to_async(ChatSession.objects.create)(user_id=user_id,title=title)
-        session_memory=await sync_to_async(SessionMemory.objects.create)(session=chat_session)
-        return chat_session.id
+        try:
+            return await ChatPersistenceService._create_session_sync(user_id,title)
+        except Exception as e:
+            print("failed to create sessions",e)
+            return None
+       
 
     @staticmethod
     async def delete_session(session_id):
@@ -23,15 +38,32 @@ class ChatPersistenceService:
         return "session deleted successfully"
 
     @staticmethod
-    async def get_user_sessions(user_id:int):
-        chat_sessions=await sync_to_async(list)(ChatSession.objects.filter(user_id=user_id))
-        return chat_sessions
+    def serialization_user_sessions(sessions:list[ChatSession]):
+        serialized_sessions=[]
+        for sn in sessions:
+            serialized_sessions.append({"id":sn.id,"title":sn.title})
+        return serialized_sessions
+
+    @staticmethod
+    async def get_user_sessions(user):
+        chat_sessions=await sync_to_async(list)(ChatSession.objects.filter(user=user))
+        serialized_sessions=ChatPersistenceService.serialization_user_sessions(chat_sessions)
+        return serialized_sessions
+
+    @staticmethod
+    def serialize_session_messages(messages:list[Message]):
+        serialized_messages=[]
+        for msg in messages:
+            serialized_messages.append({'id':msg.id,'role':msg.role,'content':msg.content,'sequence_number':msg.sequence_number})
+        return serialized_messages
+
 
     @staticmethod
     async def get_session_messages(session_id):
         session=await sync_to_async(ChatSession.objects.get)(id=session_id)
         messages=await sync_to_async(list)(session.messages.all())
-        return messages
+        serialized_messages=ChatPersistenceService.serialize_session_messages(messages=messages)
+        return serialized_messages
 
     @staticmethod
     async def update_messages(session_id,role,content):
