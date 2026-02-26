@@ -4,7 +4,7 @@ from django.http import StreamingHttpResponse,JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from apps.chat.services.services.ChatPersistence import ChatPersistenceService
+from apps.chat.services.services.ChatPersistence import ChatPersistenceService,PersistenceServiceError
 from apps.chat.services.services.chat_service import generate_response_with_persistence
 from apps.chat.models import ChatSession
 from apps.chat.services.agents.ChatBot import Agent
@@ -18,25 +18,34 @@ import json
 @csrf_exempt
 @require_http_methods(['POST'])
 async def agent_endpoint(request):
-    chat_persistence=ChatPersistenceService()
-    agent=Agent()
-    data=json.loads(request.body)
-    if data.get("create_session"):
-        user=await sync_to_async(get_user_from_request)(request=request)
-        session_id=await chat_persistence.create_session(user_id=user.id)
-    else:
-        session_id=data.get('session_id')
-    message=data.get('message')
-    memory=await chat_persistence.get_session_memory(session_id=session_id)
-    message=[HumanMessage(content=message)]
-    message=memory+message
+    try:
+        chat_persistence=ChatPersistenceService()
+        agent=Agent()
+        data=json.loads(request.body)
+        if data.get("create_session"):
+            user=await sync_to_async(get_user_from_request)(request=request)
+            session_id=await chat_persistence.create_session(user_id=user.id)
+        else:
+            session_id=data.get('session_id')
+        message=data.get('message')
+        memory=await chat_persistence.get_session_memory(session_id=session_id)
+        message=[HumanMessage(content=message)]
+        message=memory+message
 
-    response=StreamingHttpResponse(generate_response_with_persistence(chat_agent=agent,session_id=session_id,message=message))
-    response['cache-control']='no-cache'
-    response['connection']='keep-alive'
-    response['X-Accel-Buffering']='no'
+        response=StreamingHttpResponse(generate_response_with_persistence(chat_agent=agent,session_id=session_id,message=message))
+        response['cache-control']='no-cache'
+        response['connection']='keep-alive'
+        response['X-Accel-Buffering']='no'
+        return response 
+    except PersistenceServiceError as e:
+        print("chat endpoint failed ",str(e))
+        print("source of error ",e.source)
+        print('python explanation of error ',e.__cause__)
+        return JsonResponse({'error':"internal server error",
+        'message':'internal server error'}
+        ,status=500)
 
-    return response
+
 
 
 

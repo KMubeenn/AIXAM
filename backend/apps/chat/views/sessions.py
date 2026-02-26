@@ -29,6 +29,17 @@ async def get_session_messages(request):
     return JsonResponse({'session_messages':session_messages})
 
 
+@csrf_exempt
+@require_http_methods(['DELETE'])
+async def delete_session(request):
+    session_id=request.GET.get("session_id")
+    chat_persistence=ChatPersistenceService()
+    await chat_persistence.delete_session(session_id=session_id)
+
+    return JsonResponse({'response':'session deleted successfully'})
+
+
+
 
 
 

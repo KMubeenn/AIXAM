@@ -8,6 +8,12 @@ from asgiref.sync import sync_to_async
 from django.db import transaction
 
 
+class PersistenceServiceError(Exception):
+    def __init__(self,message,source):
+        super().__init__(message)
+        self.source=source
+
+
 class ChatPersistenceService:
     MAX_MESSAGES_PER_SESSION=40
 
@@ -22,12 +28,11 @@ class ChatPersistenceService:
 
 
     @staticmethod
-    async def create_session(user_id,title:str = "New chat"):
+    async def create_session(user_id,title:str = "New Chat"):
         try:
             return await ChatPersistenceService._create_session_sync(user_id,title)
         except Exception as e:
-            print("failed to create sessions",e)
-            return None
+            raise PersistenceServiceError("create_session_failed",source='create_session') from e 
        
 
     @staticmethod
