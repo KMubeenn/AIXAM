@@ -18,6 +18,7 @@ import json
 @csrf_exempt
 @require_http_methods(['POST'])
 async def agent_endpoint(request):
+    print("initiating reponse")
     try:
         chat_persistence=ChatPersistenceService()
         agent=Agent()
@@ -36,6 +37,7 @@ async def agent_endpoint(request):
         response['cache-control']='no-cache'
         response['connection']='keep-alive'
         response['X-Accel-Buffering']='no'
+        response['X-Session_id']=str(session_id)
         return response 
     except PersistenceServiceError as e:
         print("chat endpoint failed ",str(e))

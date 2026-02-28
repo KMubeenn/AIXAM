@@ -18,7 +18,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 from langchain.chat_models import init_chat_model
 from apps.chat.services.agents.agent_state import AgentState
 from langgraph.graph import StateGraph,START,END
-from langchain.messages import HumanMessage
+from langchain.messages import HumanMessage, AIMessageChunk
 from langgraph.checkpoint.memory import InMemorySaver
 from apps.chat.services.services.History import History
 
@@ -47,7 +47,7 @@ class Agent():
             {'configurable':{'thread_id':id}},
             stream_mode='messages'):
             message,meta_data=chunk
-            if meta_data.get("langgraph_node") == "llm_call" and message.content:
+            if meta_data.get("langgraph_node") == "llm_call" and isinstance(message,AIMessageChunk) and message.content:
                 yield message.content
             
 

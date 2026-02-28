@@ -10,6 +10,7 @@ from apps.chat.services.services.ChatPersistence import ChatPersistenceService
 
 
 
+
 @csrf_exempt
 @require_http_methods(['GET'])
 async def get_sessions(request):
