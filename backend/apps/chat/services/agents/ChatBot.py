@@ -18,20 +18,31 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 from langchain.chat_models import init_chat_model
 from apps.chat.services.agents.agent_state import AgentState
 from langgraph.graph import StateGraph,START,END
-from langchain.messages import HumanMessage, AIMessageChunk
+from langchain.messages import HumanMessage, AIMessageChunk,SystemMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from apps.chat.services.services.History import History
 
 class Agent():
+    system_prompt_path='apps/chat/services/configs/prompts/system_prompt.md'
     def __init__(self,temperature : float = 0.7):
         self.temperature=temperature
         self.llm=init_chat_model("groq:llama-3.1-8b-instant",temperature=self.temperature)
         self.memory=History()
         self.agent=self.agent_builder()
 
+    @staticmethod
+    def build_prompt(input:list):
+        with open(Agent.system_prompt_path,'r',encoding='utf-8') as f:
+            system_prompt=f.read().strip()
+        
+        final_prompt=[SystemMessage(content=system_prompt)]+input
+
+        return final_prompt
+
     def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
         return {"messages":type(response)(content=response.content),'final_result':True}
+    
 
     def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
@@ -43,19 +54,25 @@ class Agent():
         return agent
 
     async def astream(self,input:list,id:int):
-        async for chunk in self.agent.astream({'messages':input},
+        final_prompt=Agent.build_prompt(input)
+        async for chunk in self.agent.astream({'messages':final_prompt},
             {'configurable':{'thread_id':id}},
             stream_mode='messages'):
             message,meta_data=chunk
             if meta_data.get("langgraph_node") == "llm_call" and isinstance(message,AIMessageChunk) and message.content:
-                yield message.content
-            
+                yield message.content            
 
 if __name__=="__main__":
-    print("running the agent")
     agent_class=Agent()
-    asyncio.run(agent_class.astream("write me an essay in 2 lines", 1))
+    async def test():
+        async for token in agent_class.astream([HumanMessage(content="write me an essay in 2 lines")],1):
+            print(token,end="",flush=True)
+            
+    print("running the agent")
 
+
+  
+    asyncio.run(test())
 
     print("agent ran successfully")
 
