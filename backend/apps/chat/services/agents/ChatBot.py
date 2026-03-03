@@ -21,12 +21,14 @@ from langgraph.graph import StateGraph,START,END
 from langchain.messages import HumanMessage, AIMessageChunk,SystemMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from apps.chat.services.services.History import History
+from apps.chat.services.services.Tools import AgentTools
+
 
 class Agent():
     system_prompt_path='apps/chat/services/configs/prompts/system_prompt.md'
     def __init__(self,temperature : float = 0.7):
         self.temperature=temperature
-        self.llm=init_chat_model("groq:llama-3.1-8b-instant",temperature=self.temperature)
+        self.llm=init_chat_model("groq:llama-3.3-70b-versatile",temperature=self.temperature).bind_tools(AgentTools.return_tools())
         self.memory=History()
         self.agent=self.agent_builder()
 
@@ -41,14 +43,29 @@ class Agent():
 
     def conversation(self ,state : AgentState) ->AgentState:
         response=self.llm.invoke(state['messages'])
-        return {"messages":type(response)(content=response.content),'final_result':True}
-    
+        has_tool_calls =bool(getattr(response, "tool_calls", None))
+        return {"messages":response,"final_result": not has_tool_calls}
+
+    def should_use_tool(self,state:AgentState):
+        latest_message=state['messages'][-1]
+        if hasattr(latest_message,'tool_calls') and latest_message.tool_calls:
+            return "call_tool"
+        else:
+            return "pass"
 
     def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
         agent_builder.add_node("llm_call",self.conversation)
+        agent_builder.add_node("tool_node",AgentTools.return_tool_node())
         agent_builder.add_edge(START,"llm_call")
-        agent_builder.add_edge("llm_call",END)
+        agent_builder.add_conditional_edges("llm_call",
+        self.should_use_tool,
+        {
+            "call_tool":"tool_node",
+            "pass":END
+        }
+        )
+        agent_builder.add_edge("tool_node","llm_call")
         agent=agent_builder.compile(checkpointer=self.memory)
         
         return agent
