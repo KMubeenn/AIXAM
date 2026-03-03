@@ -12,8 +12,6 @@ def estimate_tokens(input:str)->int:
 
 
 
-
-
 async def generate_response_with_persistence(chat_agent,session_id,message):
     chat_persistence=ChatPersistenceService()
     query=message[-1].content

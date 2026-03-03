@@ -10,7 +10,7 @@ class AgentTools():
         """ this tool should be only called when user requests one of the following 
         generated flash cards , generate mock test , generate mock mcq test 
         the input should be one of following only with strict casing rules
-        flashcards,mock_test,mock_mcq_test"""
+        flashcards,mock_test,mcq_mock_test"""
         return task
 
     @staticmethod

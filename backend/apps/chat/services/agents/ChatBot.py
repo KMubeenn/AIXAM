@@ -47,15 +47,30 @@ class Agent():
         return {"messages":response,"final_result": not has_tool_calls}
 
     def should_use_tool(self,state:AgentState):
-        latest_message=state['messages'][-1]
-        if hasattr(latest_message,'tool_calls') and latest_message.tool_calls:
+        last_message=state['messages'][-1]
+        if hasattr(last_message,'tool_calls') and last_message.tool_calls:
             return "call_tool"
         else:
             return "pass"
 
+    def route_task(self,state:AgentState):
+        last_message=state['messages'][-1]
+        return last_message.content
+    
+    def generate_flashcards(self,state:AgentState):
+        pass
+
+    def generate_mock_test(self,state:AgentState):
+        pass
+    def generate_mcq_mock_test(self,state:AgentState):
+        pass
+
     def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
         agent_builder.add_node("llm_call",self.conversation)
+        agent_builder.add_node('flashcards_node',self.generate_flashcards)
+        agent_builder.add_node("mock_test_node",self.generate_mock_test)
+        agent_builder.add_node('mcq_mock_test_node',self.generate_mcq_mock_test)
         agent_builder.add_node("tool_node",AgentTools.return_tool_node())
         agent_builder.add_edge(START,"llm_call")
         agent_builder.add_conditional_edges("llm_call",
@@ -65,7 +80,18 @@ class Agent():
             "pass":END
         }
         )
-        agent_builder.add_edge("tool_node","llm_call")
+        agent_builder.add_conditional_edges("tool_node",
+        self.route_task,
+        {
+            'flashcards':'flashcards_node',
+            'mock_test':'mock_test_node',
+            'mcq_mock_test':'mcq_mock_test_node'
+        }
+        )
+        agent_builder.add_edge("flashcards_node", END)
+        agent_builder.add_edge("mock_test_node", END)
+        agent_builder.add_edge("mcq_mock_test_node", END)
+
         agent=agent_builder.compile(checkpointer=self.memory)
         
         return agent
@@ -82,7 +108,7 @@ class Agent():
 if __name__=="__main__":
     agent_class=Agent()
     async def test():
-        async for token in agent_class.astream([HumanMessage(content="write me an essay in 2 lines")],1):
+        async for token in agent_class.astream([HumanMessage(content="generate me flashcards 2 on topic llm")],1):
             print(token,end="",flush=True)
             
     print("running the agent")
@@ -91,7 +117,7 @@ if __name__=="__main__":
   
     asyncio.run(test())
 
-    print("agent ran successfully")
+    print("")
 
 
 
