@@ -58,12 +58,22 @@ class Agent():
         return last_message.content
     
     def generate_flashcards(self,state:AgentState):
-        pass
+        user_message=next(
+            msg for msg in reversed(state['messages'])
+            if isinstance(msg,HumanMessage)
+        )
 
     def generate_mock_test(self,state:AgentState):
-        pass
+        user_message=next(
+            msg for msg in reversed(state['messages'])
+            if isinstance(msg,HumanMessage)
+        )
+
     def generate_mcq_mock_test(self,state:AgentState):
-        pass
+        user_message=next(
+            msg for msg in reversed(state['messages'])
+            if isinstance(msg,HumanMessage)
+        )
 
     def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
