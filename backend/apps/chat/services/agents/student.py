@@ -1,26 +1,10 @@
-from langchain.messages import HumanMessage,AIMessage,SystemMessage
-from langchain_core.messages import BaseMessage
-from langgraph.graph import add_messages
-
-from typing import TypedDict , Annotated , Sequence
-import operator
-
-class BaseState(TypedDict , total=False):
-    system_prompt : str
-    files_input : str
-    messages : Annotated[Sequence[BaseMessage],add_messages]
-    llm_calls : int 
-    # flashcards : dict
-    # assignment : dict
-    # grades : dict
-    # classroom : dict
-    # final_result : bool
+from langchain.messages import SystemMessage
+from agent_state import BaseState
 
 class Document(TypedDict,total=False):
     title:str
     content:str
     format:str
-
 
 class GenerateMockTest(TypedDict,total=False):
     id:int
@@ -43,23 +27,10 @@ class FlashCards(TypedDict,total=False):
     question:str
     answer:str
 
-
 class StudentState(BaseState,total=False):
-    taskPrompt:str
+    taskPrompt:SystemMessage
     flashcards:list[FlashCards]
     document:Document
     mock_test:list[GenerateMockTest]
     mock_test_grades:list[GradeMockTest]
     mcq_test:list[McqMockTest]
-
-
-    
-
-
-
-    
-
-    
-
-
-

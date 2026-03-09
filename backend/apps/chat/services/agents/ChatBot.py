@@ -75,6 +75,8 @@ class Agent():
             if isinstance(msg,HumanMessage)
         )
 
+    
+
     def agent_builder(self) -> StateGraph:
         agent_builder=StateGraph(AgentState)
         agent_builder.add_node("llm_call",self.conversation)
