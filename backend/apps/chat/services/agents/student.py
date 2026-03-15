@@ -1,6 +1,7 @@
 from langchain.messages import SystemMessage
 from apps.chat.services.agents.agent_state import BaseState,Document
 from typing import TypedDict
+from pathlib import Path
 
 from apps.chat.services.services.History import History
 from apps.chat.services.services.Tools import AgentTools
@@ -28,8 +29,16 @@ class FlashCards(TypedDict,total=False):
     question:str
     answer:str
 
+class FlashCardSet(TypedDict):
+    cards:list[FlashCards]
+
+class MockTestSet(TypedDict):
+    questions:list[GenerateMockTest]
+
+class McqTestSet(TypedDict):
+    questions:list[McqMockTest]
+
 class StudentState(BaseState,total=False):
-    taskPrompt:SystemMessage
     flashcards:list[FlashCards]
     document:Document
     mock_test:list[GenerateMockTest]
@@ -38,23 +47,26 @@ class StudentState(BaseState,total=False):
 
 
 class StudentAgent():
+    PROMPT_DIR=Path(__file__).resolve().parent.parent / 'configs' / 'prompts'
+
     def __init__(self,temperature:float = 0.7):
         self.temperature=temperature
-        self.llm=init_chat_model("groq:llama-3.3-70b-versatile",temperature=self.temperature).bind_tools(AgentTools.return_tools())
+        base_llm=init_chat_model("groq:llama-3.3-70b-versatile",temperature=self.temperature)
+        self.llm=base_llm.bind_tools(AgentTools.return_tools())
+        self.flashcard_llm=base_llm.with_structured_output(FlashCardSet)
+        self.mock_test_llm=base_llm.with_structured_output(MockTestSet)
+        self.mcq_llm=base_llm.with_structured_output(McqTestSet)
         self.memory=History()
 
     @staticmethod
-    def task_prompt(input:list):
-        pass
-        # with open(Agent.system_prompt_path,'r',encoding='utf-8') as f:
-        #     system_prompt=f.read().strip()
-
-        # return SystemMessage(content=system_prompt)
+    def load_task_prompt(filename:str)->SystemMessage:
+        prompt_path=StudentAgent.PROMPT_DIR / filename
+        with open(prompt_path,'r',encoding='utf-8') as f:
+            return SystemMessage(content=f.read().strip())
 
     def conversation(self ,state : StudentState) ->StudentState:
         messages=[state['system_prompt']]+list(state['messages'])
         response=self.llm.invoke(messages)
-        has_tool_calls =bool(getattr(response, "tool_calls", None))
         return {"messages":response}
 
     def should_use_tool(self,state:StudentState):
@@ -69,22 +81,31 @@ class StudentAgent():
         return last_message.content
     
     def generate_flashcards(self,state:StudentState):
+        task_prompt=StudentAgent.load_task_prompt('flashcard_prompt.md')
         user_message=next(
             msg for msg in reversed(state['messages'])
             if isinstance(msg,HumanMessage)
         )
+        result=self.flashcard_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        return {"flashcards":result['cards']}
 
     def generate_mock_test(self,state:StudentState):
+        task_prompt=StudentAgent.load_task_prompt('mock_test_prompt.md')
         user_message=next(
             msg for msg in reversed(state['messages'])
             if isinstance(msg,HumanMessage)
         )
+        result=self.mock_test_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        return {"mock_test":result['questions']}
 
     def generate_mcq_mock_test(self,state:StudentState):
+        task_prompt=StudentAgent.load_task_prompt('mcq_test_prompt.md')
         user_message=next(
             msg for msg in reversed(state['messages'])
             if isinstance(msg,HumanMessage)
         )
+        result=self.mcq_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        return {"mcq_test":result['questions']}
 
     
 

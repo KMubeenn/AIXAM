@@ -14,47 +14,61 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
-from apps.chat.services.agents.student import StudentState,StudentAgent
+from apps.chat.services.agents.student import StudentAgent
 from apps.chat.services.agents.teacher import TeacherState
-
-from langchain.messages import SystemMessage
-
+from langchain.messages import SystemMessage,HumanMessage,AIMessageChunk
 
 
 class Agent():
-    system_prompt_path='apps/chat/services/configs/prompts/system_prompt.md'
-    def __init__(self,role:str,temperature : float = 0.7):
-        self.agent=StudentAgent() if role=='student' else StudentAgent()
+    system_prompt_path=Path(__file__).resolve().parent.parent / 'configs' / 'prompts' / 'system_prompt.md'
+
+    def __init__(self,role:str,temperature:float=0.7):
+        self.agent=StudentAgent(temperature) if role=='student' else StudentAgent(temperature)
         self.agent_graph=self.agent.agent_builder()
-    
+
     @staticmethod
     def build_prompt():
         with open(Agent.system_prompt_path,'r',encoding='utf-8') as f:
             system_prompt=f.read().strip()
-
         return SystemMessage(content=system_prompt)
 
-    async def astream(self,input:list,id:int):
+    async def run(self,input:list,id:int):
         system_prompt=Agent.build_prompt()
-        async for chunk in self.agent_graph.astream({'system_prompt':system_prompt,'messages':input},
-            {'configurable':{'thread_id':id}},
-            stream_mode='messages'):
+        config={'configurable':{'thread_id':id}}
+
+        async for chunk in self.agent_graph.astream(
+            {'system_prompt':system_prompt,'messages':input},
+            config,
+            stream_mode='messages'
+        ):
             message,meta_data=chunk
-            if meta_data.get("langgraph_node") == "llm_call" and isinstance(message,AIMessageChunk) and message.content:
-                yield message.content            
+            if (meta_data.get("langgraph_node")=="llm_call"
+                and isinstance(message,AIMessageChunk)
+                and message.content):
+                yield {"type":"token","content":message.content}
+
+        final_state=(await self.agent_graph.aget_state(config)).values
+
+        if final_state.get('flashcards'):
+            yield {"type":"flashcards","data":final_state['flashcards']}
+        elif final_state.get('mock_test'):
+            yield {"type":"mock_test","data":final_state['mock_test']}
+        elif final_state.get('mcq_test'):
+            yield {"type":"mcq_test","data":final_state['mcq_test']}
+
 
 if __name__=="__main__":
     agent_class=Agent(role='student')
+
     async def test():
-        async for token in agent_class.astream([HumanMessage(content="generate me flashcards 2 on topic llm")],1):
-            print(token,end="",flush=True)
-            
+        async for output in agent_class.run([HumanMessage(content="generate me a mock mcq test on llm topic")],1):
+            if output["type"]=="token":
+                print(output["content"],end="",flush=True)
+            else:
+                print(f"\n\n[{output['type']}]:",output["data"])
+
     print("running the agent")
-
-
-  
     asyncio.run(test())
-
     print("")
 
 
