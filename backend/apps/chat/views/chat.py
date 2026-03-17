@@ -18,22 +18,31 @@ import json
 @csrf_exempt
 @require_http_methods(['POST'])
 async def agent_endpoint(request):
-    print("initiating reponse")
     try:
         chat_persistence=ChatPersistenceService()
-        agent=Agent()
         data=json.loads(request.body)
+        user=await sync_to_async(get_user_from_request)(request=request)
+        role=data.get('role','student')
+
         if data.get("create_session"):
-            user=await sync_to_async(get_user_from_request)(request=request)
             session_id=await chat_persistence.create_session(user_id=user.id)
         else:
             session_id=data.get('session_id')
-        message=data.get('message')
-        memory=await chat_persistence.get_session_memory(session_id=session_id)
-        message=[HumanMessage(content=message)]
-        message=memory+message
 
-        response=StreamingHttpResponse(generate_response_with_persistence(chat_agent=agent,session_id=session_id,message=message))
+        agent=Agent(role=role)
+
+        memory=await chat_persistence.get_session_memory(session_id=session_id)
+        agent.load_history(memory)
+
+        files=request.FILES.getlist("files")
+        if files:
+            agent.load_document(files[0])
+
+        message=[HumanMessage(content=data.get('message'))]
+
+        response=StreamingHttpResponse(
+            generate_response_with_persistence(chat_agent=agent,session_id=session_id,message=message)
+        )
         response['cache-control']='no-cache'
         response['connection']='keep-alive'
         response['X-Accel-Buffering']='no'

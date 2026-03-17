@@ -16,7 +16,9 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 from apps.chat.services.agents.student import StudentAgent
 from apps.chat.services.agents.teacher import TeacherState
+from apps.chat.services.utilities.DocReader import DocumentReader
 from langchain.messages import SystemMessage,HumanMessage,AIMessageChunk
+from langchain.chat_models import init_chat_model
 
 
 class Agent():
@@ -25,6 +27,9 @@ class Agent():
     def __init__(self,role:str,temperature:float=0.7):
         self.agent=StudentAgent(temperature) if role=='student' else StudentAgent(temperature)
         self.agent_graph=self.agent.agent_builder()
+        self.confirmation_llm=init_chat_model("groq:llama-3.3-70b-versatile",temperature=0.7)
+        self.history=[]
+        self.document_context=None
 
     @staticmethod
     def build_prompt():
@@ -32,12 +37,28 @@ class Agent():
             system_prompt=f.read().strip()
         return SystemMessage(content=system_prompt)
 
+    def load_history(self,history:list):
+        self.history=history
+
+    def load_document(self,file):
+        reader=DocumentReader()
+        chunks=reader.read(file,filename=file.name)
+        self.document_context="\n\n".join(chunks)
+
     async def run(self,input:list,id:int):
         system_prompt=Agent.build_prompt()
         config={'configurable':{'thread_id':id}}
 
+        messages=self.history+input
+
+        if self.document_context:
+            doc_message=HumanMessage(
+                content=f"The user has uploaded a document with the following content:\n\n{self.document_context}"
+            )
+            messages=[doc_message]+messages
+
         async for chunk in self.agent_graph.astream(
-            {'system_prompt':system_prompt,'messages':input},
+            {'system_prompt':system_prompt,'messages':messages},
             config,
             stream_mode='messages'
         ):
@@ -49,12 +70,33 @@ class Agent():
 
         final_state=(await self.agent_graph.aget_state(config)).values
 
+        task_done=None
         if final_state.get('flashcards'):
             yield {"type":"flashcards","data":final_state['flashcards']}
+            task_done="flashcards"
         elif final_state.get('mock_test'):
             yield {"type":"mock_test","data":final_state['mock_test']}
+            task_done="mock test"
         elif final_state.get('mcq_test'):
             yield {"type":"mcq_test","data":final_state['mcq_test']}
+            task_done="MCQ test"
+        elif final_state.get('document'):
+            yield {"type":"document","data":final_state['document']}
+            task_done=f"{final_state['document'].get('format','').upper()} document"
+
+        if task_done:
+            user_msg=next(
+                msg for msg in reversed(input)
+                if isinstance(msg,HumanMessage)
+            )
+            prompt=SystemMessage(
+                content=f"You just successfully generated {task_done} for the user. "
+                        f"Write a brief, friendly confirmation message in 1-2 sentences."
+            )
+            async for chunk in self.confirmation_llm.astream([prompt,user_msg]):
+                if chunk.content:
+                    yield {"type":"token","content":chunk.content}
+
 
 
 if __name__=="__main__":

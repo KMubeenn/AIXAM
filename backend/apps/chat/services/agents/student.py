@@ -5,6 +5,7 @@ from pathlib import Path
 
 from apps.chat.services.services.History import History
 from apps.chat.services.services.Tools import AgentTools
+from apps.chat.services.utilities.DocWriter import DocumentWriter
 from langchain.messages import HumanMessage, AIMessageChunk
 from langgraph.graph import StateGraph,START,END
 from langchain.chat_models import init_chat_model
@@ -56,6 +57,8 @@ class StudentAgent():
         self.flashcard_llm=base_llm.with_structured_output(FlashCardSet)
         self.mock_test_llm=base_llm.with_structured_output(MockTestSet)
         self.mcq_llm=base_llm.with_structured_output(McqTestSet)
+        self.doc_llm=base_llm
+        self.doc_writer=DocumentWriter()
         self.memory=History()
 
     @staticmethod
@@ -109,12 +112,31 @@ class StudentAgent():
 
     
 
+    def generate_document(self,state:StudentState):
+        task_prompt=StudentAgent.load_task_prompt('document_prompt.md')
+        user_message=next(
+            msg for msg in reversed(state['messages'])
+            if isinstance(msg,HumanMessage)
+        )
+        tool_message=state['messages'][-1]
+        doc_format=tool_message.content.replace('generate_','')  # 'generate_pdf' → 'pdf'
+
+        result=self.doc_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        content=result.content
+
+        title=content.split('\n')[0].strip().lstrip('# ') if content else 'Document'
+        file_path=self.doc_writer.write(title=title,content=content,format=doc_format)
+
+        return {"document":{"title":title,"content":content,"format":doc_format,"file_path":file_path}}
+
+
     def agent_builder(self)-> StateGraph:
         agent_builder=StateGraph(StudentState)
         agent_builder.add_node("llm_call",self.conversation)
         agent_builder.add_node('flashcards_node',self.generate_flashcards)
         agent_builder.add_node("mock_test_node",self.generate_mock_test)
         agent_builder.add_node('mcq_mock_test_node',self.generate_mcq_mock_test)
+        agent_builder.add_node('generate_document_node',self.generate_document)
         agent_builder.add_node("tool_node",AgentTools.return_tool_node())
         agent_builder.add_edge(START,"llm_call")
         agent_builder.add_conditional_edges("llm_call",
@@ -129,12 +151,16 @@ class StudentAgent():
         {
             'flashcards':'flashcards_node',
             'mock_test':'mock_test_node',
-            'mcq_mock_test':'mcq_mock_test_node'
+            'mcq_mock_test':'mcq_mock_test_node',
+            'generate_pdf':'generate_document_node',
+            'generate_docx':'generate_document_node',
+            'generate_pptx':'generate_document_node'
         }
         )
         agent_builder.add_edge("flashcards_node", END)
         agent_builder.add_edge("mock_test_node", END)
         agent_builder.add_edge("mcq_mock_test_node", END)
+        agent_builder.add_edge("generate_document_node", END)
 
         agent=agent_builder.compile(checkpointer=self.memory)
         

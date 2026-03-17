@@ -21,6 +21,7 @@ class Document(TypedDict,total=False):
     title:str
     content:str
     format:str
+    file_path:str
 
 
 

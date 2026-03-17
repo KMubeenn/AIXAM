@@ -1,5 +1,6 @@
 
 import asyncio
+import json
 
 from apps.chat.services.services.ChatPersistence import ChatPersistenceService
 
@@ -16,18 +17,21 @@ async def generate_response_with_persistence(chat_agent,session_id,message):
     chat_persistence=ChatPersistenceService()
     query=message[-1].content
     await chat_persistence.update_messages(session_id=session_id,role="user",content=query)
-    agent=chat_agent
     full_response=[]
     if await chat_persistence.get_title(session_id=session_id)=='New Chat':
         await chat_persistence.set_title(session_id=session_id,message=query)
 
-    async for token in agent.astream(input=message,id=session_id):
-        full_response.append(token)
-        yield token
+    async for output in chat_agent.run(input=message,id=session_id):
+        if output["type"]=="token":
+            full_response.append(output["content"])
+            yield output["content"]
+        else:
+            yield json.dumps(output)
 
     response=''.join(full_response)
-    await chat_persistence.update_messages(session_id=session_id,role='assistant',content=response)
-    await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=response)
+    if response:
+        await chat_persistence.update_messages(session_id=session_id,role='assistant',content=response)
+        await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=response)
 
 
 
