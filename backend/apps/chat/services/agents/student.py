@@ -1,3 +1,4 @@
+import json
 from langchain.messages import SystemMessage
 from apps.chat.services.agents.agent_state import BaseState,Document
 from typing import TypedDict
@@ -14,10 +15,14 @@ class GenerateMockTest(TypedDict,total=False):
     id:int
     question:str
 
-class GradeMockTest(GenerateMockTest,total=False):
-    answer:str
-    rubrics:str
-    grades:str
+class GradeMockTest(TypedDict,total=False):
+    id:int
+    question:str
+    student_answer:str
+    correct_answer:str
+    marks:float
+    max_marks:float
+    feedback:str
 
 class McqMockTest(TypedDict,total=False):
     id:int
@@ -39,12 +44,20 @@ class MockTestSet(TypedDict):
 class McqTestSet(TypedDict):
     questions:list[McqMockTest]
 
+class GradingResult(TypedDict):
+    grades:list[GradeMockTest]
+    total_marks:float
+    max_total_marks:float
+    overall_feedback:str
+
 class StudentState(BaseState,total=False):
     flashcards:list[FlashCards]
     document:Document
     mock_test:list[GenerateMockTest]
-    mock_test_grades:list[GradeMockTest]
+    mock_test_grades:GradingResult
     mcq_test:list[McqMockTest]
+    grade_test:bool
+    test_submission:list[dict]
 
 
 class StudentAgent():
@@ -57,6 +70,7 @@ class StudentAgent():
         self.flashcard_llm=base_llm.with_structured_output(FlashCardSet)
         self.mock_test_llm=base_llm.with_structured_output(MockTestSet)
         self.mcq_llm=base_llm.with_structured_output(McqTestSet)
+        self.grading_llm=base_llm.with_structured_output(GradingResult)
         self.doc_llm=base_llm
         self.doc_writer=DocumentWriter()
         self.memory=History()
@@ -67,10 +81,80 @@ class StudentAgent():
         with open(prompt_path,'r',encoding='utf-8') as f:
             return SystemMessage(content=f.read().strip())
 
-    def conversation(self ,state : StudentState) ->StudentState:
+    # ──────────────────────────────────────────────
+    # GRAPH NODES
+    # ──────────────────────────────────────────────
+
+    def conversation(self,state:StudentState)->StudentState:
         messages=[state['system_prompt']]+list(state['messages'])
+        if state.get('files_input'):
+            file_context=SystemMessage(content=f"The user has uploaded a document. Its content is available for reference:\n\n{state['files_input']}")
+            messages.insert(1,file_context)
         response=self.llm.invoke(messages)
-        return {"messages":response}
+        current_calls=state.get('llm_calls',0)
+        return {"messages":response,"llm_calls":current_calls+1}
+
+    def orchestrator(self,state:StudentState):
+        tool_message=state['messages'][-1]
+        plan=json.loads(tool_message.content)
+
+        step_outputs={}
+        results={}
+        total_llm_calls=0
+
+        for step in plan:
+            task=step['task']
+            dep=step.get('depends_on')
+            source_data=step_outputs.get(dep)
+
+            if task=='flashcards':
+                output=self._generate_flashcards(state)
+                step_outputs[step['step']]=output['flashcards']
+                results.update(output)
+                total_llm_calls+=1
+
+            elif task=='mock_test':
+                output=self._generate_mock_test(state)
+                step_outputs[step['step']]=output['mock_test']
+                results.update(output)
+                total_llm_calls+=1
+
+            elif task=='mcq_mock_test':
+                output=self._generate_mcq_mock_test(state)
+                step_outputs[step['step']]=output['mcq_test']
+                results.update(output)
+                total_llm_calls+=1
+
+            elif task in ('generate_pdf','generate_docx','generate_pptx'):
+                doc_format=task.replace('generate_','')
+                if source_data:
+                    output=self._export_as_document(source_data,doc_format,state)
+                else:
+                    output=self._generate_document(state,doc_format)
+                    total_llm_calls+=1
+                step_outputs[step['step']]=output['document']
+                results.update(output)
+
+        current_calls=state.get('llm_calls',0)
+        results['llm_calls']=current_calls+total_llm_calls
+        return results
+
+    def grade_mock_test(self,state:StudentState):
+        task_prompt=StudentAgent.load_task_prompt('grading_prompt.md')
+        submission=state['test_submission']
+        submission_text=HumanMessage(content=json.dumps(submission))
+        result=self.grading_llm.invoke([state['system_prompt'],task_prompt,submission_text])
+        current_calls=state.get('llm_calls',0)
+        return {"mock_test_grades":result,"llm_calls":current_calls+1}
+
+    # ──────────────────────────────────────────────
+    # ROUTING
+    # ──────────────────────────────────────────────
+
+    def entry_router(self,state:StudentState):
+        if state.get('grade_test'):
+            return "grade"
+        return "conversation"
 
     def should_use_tool(self,state:StudentState):
         last_message=state['messages'][-1]
@@ -79,89 +163,101 @@ class StudentAgent():
         else:
             return "pass"
 
-    def route_task(self,state:StudentState):
-        last_message=state['messages'][-1]
-        return last_message.content
-    
-    def generate_flashcards(self,state:StudentState):
-        task_prompt=StudentAgent.load_task_prompt('flashcard_prompt.md')
+    # ──────────────────────────────────────────────
+    # TASK FUNCTIONS (called by orchestrator)
+    # ──────────────────────────────────────────────
+
+    def _build_task_messages(self,state:StudentState,task_prompt:SystemMessage):
         user_message=next(
             msg for msg in reversed(state['messages'])
             if isinstance(msg,HumanMessage)
         )
-        result=self.flashcard_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        messages=[state['system_prompt'],task_prompt]
+        if state.get('files_input'):
+            file_context=SystemMessage(content=f"The user has uploaded a document. Use its content as the source material:\n\n{state['files_input']}")
+            messages.append(file_context)
+        messages.append(user_message)
+        return messages
+
+    def _generate_flashcards(self,state:StudentState):
+        task_prompt=StudentAgent.load_task_prompt('flashcard_prompt.md')
+        messages=self._build_task_messages(state,task_prompt)
+        result=self.flashcard_llm.invoke(messages)
         return {"flashcards":result['cards']}
 
-    def generate_mock_test(self,state:StudentState):
+    def _generate_mock_test(self,state:StudentState):
         task_prompt=StudentAgent.load_task_prompt('mock_test_prompt.md')
-        user_message=next(
-            msg for msg in reversed(state['messages'])
-            if isinstance(msg,HumanMessage)
-        )
-        result=self.mock_test_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        messages=self._build_task_messages(state,task_prompt)
+        result=self.mock_test_llm.invoke(messages)
         return {"mock_test":result['questions']}
 
-    def generate_mcq_mock_test(self,state:StudentState):
+    def _generate_mcq_mock_test(self,state:StudentState):
         task_prompt=StudentAgent.load_task_prompt('mcq_test_prompt.md')
-        user_message=next(
-            msg for msg in reversed(state['messages'])
-            if isinstance(msg,HumanMessage)
-        )
-        result=self.mcq_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        messages=self._build_task_messages(state,task_prompt)
+        result=self.mcq_llm.invoke(messages)
         return {"mcq_test":result['questions']}
 
-    
-
-    def generate_document(self,state:StudentState):
+    def _generate_document(self,state:StudentState,doc_format:str):
         task_prompt=StudentAgent.load_task_prompt('document_prompt.md')
-        user_message=next(
-            msg for msg in reversed(state['messages'])
-            if isinstance(msg,HumanMessage)
-        )
-        tool_message=state['messages'][-1]
-        doc_format=tool_message.content.replace('generate_','')  # 'generate_pdf' → 'pdf'
-
-        result=self.doc_llm.invoke([state['system_prompt'],task_prompt,user_message])
+        messages=self._build_task_messages(state,task_prompt)
+        result=self.doc_llm.invoke(messages)
         content=result.content
-
         title=content.split('\n')[0].strip().lstrip('# ') if content else 'Document'
         file_path=self.doc_writer.write(title=title,content=content,format=doc_format)
-
         return {"document":{"title":title,"content":content,"format":doc_format,"file_path":file_path}}
 
+    def _export_as_document(self,source_data,doc_format:str,state:StudentState):
+        if isinstance(source_data,list):
+            lines=[]
+            for item in source_data:
+                if 'question' in item and 'options' in item:
+                    lines.append(f"## Q{item.get('id','')}. {item['question']}")
+                    for key,val in item['options'].items():
+                        lines.append(f"- {key}) {val}")
+                    lines.append(f"**Answer: {item.get('answer','')}**")
+                    lines.append("")
+                elif 'question' in item and 'answer' in item:
+                    lines.append(f"## Q{item.get('id','')}. {item['question']}")
+                    lines.append(f"**Answer:** {item['answer']}")
+                    lines.append("")
+                elif 'question' in item:
+                    lines.append(f"## Q{item.get('id','')}. {item['question']}")
+                    lines.append("")
+            content='\n'.join(lines)
+            title="Generated Content"
+        else:
+            content=str(source_data)
+            title="Document"
+
+        file_path=self.doc_writer.write(title=title,content=content,format=doc_format)
+        return {"document":{"title":title,"content":content,"format":doc_format,"file_path":file_path}}
+
+    # ──────────────────────────────────────────────
+    # GRAPH BUILDER
+    # ──────────────────────────────────────────────
 
     def agent_builder(self)-> StateGraph:
         agent_builder=StateGraph(StudentState)
+
         agent_builder.add_node("llm_call",self.conversation)
-        agent_builder.add_node('flashcards_node',self.generate_flashcards)
-        agent_builder.add_node("mock_test_node",self.generate_mock_test)
-        agent_builder.add_node('mcq_mock_test_node',self.generate_mcq_mock_test)
-        agent_builder.add_node('generate_document_node',self.generate_document)
         agent_builder.add_node("tool_node",AgentTools.return_tool_node())
-        agent_builder.add_edge(START,"llm_call")
-        agent_builder.add_conditional_edges("llm_call",
-        self.should_use_tool,
-        {
+        agent_builder.add_node("orchestrator",self.orchestrator)
+        agent_builder.add_node("grade_mock_test_node",self.grade_mock_test)
+
+        agent_builder.add_conditional_edges(START,self.entry_router,{
+            "conversation":"llm_call",
+            "grade":"grade_mock_test_node"
+        })
+
+        agent_builder.add_conditional_edges("llm_call",self.should_use_tool,{
             "call_tool":"tool_node",
             "pass":END
-        }
-        )
-        agent_builder.add_conditional_edges("tool_node",
-        self.route_task,
-        {
-            'flashcards':'flashcards_node',
-            'mock_test':'mock_test_node',
-            'mcq_mock_test':'mcq_mock_test_node',
-            'generate_pdf':'generate_document_node',
-            'generate_docx':'generate_document_node',
-            'generate_pptx':'generate_document_node'
-        }
-        )
-        agent_builder.add_edge("flashcards_node", END)
-        agent_builder.add_edge("mock_test_node", END)
-        agent_builder.add_edge("mcq_mock_test_node", END)
-        agent_builder.add_edge("generate_document_node", END)
+        })
+
+        agent_builder.add_edge("tool_node","orchestrator")
+        agent_builder.add_edge("orchestrator",END)
+        agent_builder.add_edge("grade_mock_test_node",END)
 
         agent=agent_builder.compile(checkpointer=self.memory)
-        
+
         return agent

@@ -1,8 +1,8 @@
 
-import asyncio
 import json
 
 from apps.chat.services.services.ChatPersistence import ChatPersistenceService
+from apps.core.services import CoreService
 
 
 AVG_CHARS_PER_TOKEN=4
@@ -13,7 +13,7 @@ def estimate_tokens(input:str)->int:
 
 
 
-async def generate_response_with_persistence(chat_agent,session_id,message):
+async def generate_response_with_persistence(chat_agent,session_id,message,user_id=None,grade_test=False,test_submission=None):
     chat_persistence=ChatPersistenceService()
     query=message[-1].content
     await chat_persistence.update_messages(session_id=session_id,role="user",content=query)
@@ -21,17 +21,52 @@ async def generate_response_with_persistence(chat_agent,session_id,message):
     if await chat_persistence.get_title(session_id=session_id)=='New Chat':
         await chat_persistence.set_title(session_id=session_id,message=query)
 
-    async for output in chat_agent.run(input=message,id=session_id):
+    async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission):
         if output["type"]=="token":
             full_response.append(output["content"])
             yield output["content"]
         else:
+            if user_id:
+                await _persist_structured_output(user_id,output)
             yield json.dumps(output)
 
     response=''.join(full_response)
     if response:
         await chat_persistence.update_messages(session_id=session_id,role='assistant',content=response)
         await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=response)
+
+
+async def _persist_structured_output(user_id,output):
+    output_type=output.get('type')
+    data=output.get('data')
+    if not data:
+        return
+
+    try:
+        if output_type=='flashcards':
+            await CoreService.save_flashcard_set(
+                user_id=user_id,
+                cards=data,
+                title=f"Flashcards ({len(data)} cards)"
+            )
+        elif output_type=='mock_test':
+            await CoreService.save_mock_test(
+                user_id=user_id,
+                questions=data,
+                title=f"Mock Test ({len(data)} questions)"
+            )
+        elif output_type=='mcq_test':
+            await CoreService.save_mcq_test(
+                user_id=user_id,
+                questions=data,
+                title=f"MCQ Test ({len(data)} questions)"
+            )
+        elif output_type=='mock_test_grades':
+            pass
+        elif output_type=='document':
+            pass
+    except Exception as e:
+        print(f"[CorePersistence] Failed to save {output_type}: {e}")
 
 
 

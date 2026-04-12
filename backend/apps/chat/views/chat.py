@@ -40,8 +40,18 @@ async def agent_endpoint(request):
 
         message=[HumanMessage(content=data.get('message'))]
 
+        grade_test=data.get('grade_test',False)
+        test_submission=data.get('test_submission',None)
+
         response=StreamingHttpResponse(
-            generate_response_with_persistence(chat_agent=agent,session_id=session_id,message=message)
+            generate_response_with_persistence(
+                chat_agent=agent,
+                session_id=session_id,
+                message=message,
+                user_id=user.id,
+                grade_test=grade_test,
+                test_submission=test_submission
+            )
         )
         response['cache-control']='no-cache'
         response['connection']='keep-alive'

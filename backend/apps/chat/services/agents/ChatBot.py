@@ -45,7 +45,7 @@ class Agent():
         chunks=reader.read(file,filename=file.name)
         self.document_context="\n\n".join(chunks)
 
-    async def run(self,input:list,id:int):
+    async def run(self,input:list,id:int,grade_test=False,test_submission=None):
         system_prompt=Agent.build_prompt()
         config={'configurable':{'thread_id':id}}
 
@@ -57,8 +57,15 @@ class Agent():
             )
             messages=[doc_message]+messages
 
+        state_input={'system_prompt':system_prompt,'messages':messages}
+        if self.document_context:
+            state_input['files_input']=self.document_context
+        if grade_test and test_submission:
+            state_input['grade_test']=True
+            state_input['test_submission']=test_submission
+
         async for chunk in self.agent_graph.astream(
-            {'system_prompt':system_prompt,'messages':messages},
+            state_input,
             config,
             stream_mode='messages'
         ):
@@ -70,27 +77,31 @@ class Agent():
 
         final_state=(await self.agent_graph.aget_state(config)).values
 
-        task_done=None
+        task_done=[]
         if final_state.get('flashcards'):
             yield {"type":"flashcards","data":final_state['flashcards']}
-            task_done="flashcards"
-        elif final_state.get('mock_test'):
+            task_done.append("flashcards")
+        if final_state.get('mock_test'):
             yield {"type":"mock_test","data":final_state['mock_test']}
-            task_done="mock test"
-        elif final_state.get('mcq_test'):
+            task_done.append("mock test")
+        if final_state.get('mcq_test'):
             yield {"type":"mcq_test","data":final_state['mcq_test']}
-            task_done="MCQ test"
-        elif final_state.get('document'):
+            task_done.append("MCQ test")
+        if final_state.get('document'):
             yield {"type":"document","data":final_state['document']}
-            task_done=f"{final_state['document'].get('format','').upper()} document"
+            task_done.append(f"{final_state['document'].get('format','').upper()} document")
+        if final_state.get('mock_test_grades'):
+            yield {"type":"mock_test_grades","data":final_state['mock_test_grades']}
+            task_done.append("test grading")
 
         if task_done:
+            task_list=" and ".join(task_done)
             user_msg=next(
                 msg for msg in reversed(input)
                 if isinstance(msg,HumanMessage)
             )
             prompt=SystemMessage(
-                content=f"You just successfully generated {task_done} for the user. "
+                content=f"You just successfully generated {task_list} for the user. "
                         f"Write a brief, friendly confirmation message in 1-2 sentences."
             )
             async for chunk in self.confirmation_llm.astream([prompt,user_msg]):
