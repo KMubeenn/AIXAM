@@ -13,21 +13,26 @@ def estimate_tokens(input:str)->int:
 
 
 
-async def generate_response_with_persistence(chat_agent,session_id,message,user_id=None,grade_test=False,test_submission=None):
+async def generate_response_with_persistence(chat_agent,session_id,message,user_id=None,grade_test=False,test_submission=None,study_material_id=None,quiz_id=None,grading_instructions=None):
     chat_persistence=ChatPersistenceService()
     query=message[-1].content
     await chat_persistence.update_messages(session_id=session_id,role="user",content=query)
     full_response=[]
     if await chat_persistence.get_title(session_id=session_id)=='New Chat':
-        await chat_persistence.set_title(session_id=session_id,message=query)
+        from apps.chat.services.utilities.TopicExtractor import TopicExtractor
+        extractor = TopicExtractor()
+        topic = await extractor.extract_topic(query)
+        await chat_persistence.set_title(session_id=session_id,message=topic)
 
-    async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission):
+    async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions):
         if output["type"]=="token":
             full_response.append(output["content"])
             yield output["content"]
         else:
             if user_id:
-                await _persist_structured_output(user_id,output)
+                record_id=await _persist_structured_output(user_id,output,session_id,study_material_id,quiz_id)
+                if record_id:
+                    output['record_id']=record_id
             yield json.dumps(output)
 
     response=''.join(full_response)
@@ -36,37 +41,66 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
         await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=response)
 
 
-async def _persist_structured_output(user_id,output):
+async def _persist_structured_output(user_id,output,session_id,study_material_id=None,quiz_id=None):
+    """Persist structured output to DB. Returns the DB record ID if created."""
     output_type=output.get('type')
     data=output.get('data')
     if not data:
-        return
+        return None
+
+    # Determine topic from chat session
+    chat_persistence = ChatPersistenceService()
+    session_title = await chat_persistence.get_title(session_id)
+    topic = session_title if session_title and session_title != "New Chat" else "General"
 
     try:
         if output_type=='flashcards':
-            await CoreService.save_flashcard_set(
+            source_type = 'file' if study_material_id else 'topic'
+            return await CoreService.save_flashcard_set(
                 user_id=user_id,
                 cards=data,
-                title=f"Flashcards ({len(data)} cards)"
+                title=f"{topic} Flashcards",
+                source_type=source_type,
+                topic=topic,
+                study_material_id=study_material_id
             )
         elif output_type=='mock_test':
-            await CoreService.save_mock_test(
+            return await CoreService.save_mock_test(
                 user_id=user_id,
                 questions=data,
-                title=f"Mock Test ({len(data)} questions)"
+                title=f"{topic} Mock Test",
+                study_material_id=study_material_id
             )
         elif output_type=='mcq_test':
-            await CoreService.save_mcq_test(
+            return await CoreService.save_mcq_test(
                 user_id=user_id,
                 questions=data,
-                title=f"MCQ Test ({len(data)} questions)"
+                title=f"{topic} MCQ Test",
+                study_material_id=study_material_id
             )
         elif output_type=='mock_test_grades':
-            pass
+            total_marks=data.get('total_marks',0)
+            max_total_marks=data.get('max_total_marks',0)
+            overall_feedback=data.get('overall_feedback','')
+            score_pct=(total_marks/max_total_marks*100) if max_total_marks>0 else 0
+
+            submission=await CoreService.save_submission(
+                student_id=user_id,
+                quiz_id=quiz_id,
+                score=score_pct,
+                feedback=overall_feedback
+            )
+            await CoreService.update_student_performance(
+                student_id=user_id,
+                topic=topic,
+                score=score_pct
+            )
+            return str(submission.id)
         elif output_type=='document':
-            pass
+            return None
     except Exception as e:
         print(f"[CorePersistence] Failed to save {output_type}: {e}")
+        return None
 
 
 

@@ -45,7 +45,7 @@ class Agent():
         chunks=reader.read(file,filename=file.name)
         self.document_context="\n\n".join(chunks)
 
-    async def run(self,input:list,id:int,grade_test=False,test_submission=None):
+    async def run(self,input:list,id:int,grade_test=False,test_submission=None,grading_instructions=None):
         system_prompt=Agent.build_prompt()
         config={'configurable':{'thread_id':id}}
 
@@ -63,6 +63,8 @@ class Agent():
         if grade_test and test_submission:
             state_input['grade_test']=True
             state_input['test_submission']=test_submission
+            if grading_instructions:
+                state_input['grading_instructions']=grading_instructions
 
         async for chunk in self.agent_graph.astream(
             state_input,

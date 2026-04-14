@@ -58,6 +58,7 @@ class StudentState(BaseState,total=False):
     mcq_test:list[McqMockTest]
     grade_test:bool
     test_submission:list[dict]
+    grading_instructions:str
 
 
 class StudentAgent():
@@ -143,7 +144,13 @@ class StudentAgent():
         task_prompt=StudentAgent.load_task_prompt('grading_prompt.md')
         submission=state['test_submission']
         submission_text=HumanMessage(content=json.dumps(submission))
-        result=self.grading_llm.invoke([state['system_prompt'],task_prompt,submission_text])
+        messages=[state['system_prompt'],task_prompt]
+        # Inject optional custom grading instructions if the frontend provides them
+        grading_instructions=state.get('grading_instructions')
+        if grading_instructions:
+            messages.append(SystemMessage(content=f"Additional grading instructions from the student:\n{grading_instructions}"))
+        messages.append(submission_text)
+        result=self.grading_llm.invoke(messages)
         current_calls=state.get('llm_calls',0)
         return {"mock_test_grades":result,"llm_calls":current_calls+1}
 
@@ -203,8 +210,8 @@ class StudentAgent():
         result=self.doc_llm.invoke(messages)
         content=result.content
         title=content.split('\n')[0].strip().lstrip('# ') if content else 'Document'
-        file_path=self.doc_writer.write(title=title,content=content,format=doc_format)
-        return {"document":{"title":title,"content":content,"format":doc_format,"file_path":file_path}}
+        doc_result=self.doc_writer.write(title=title,content=content,format=doc_format)
+        return {"document":{"title":title,"content":content,"format":doc_format,**doc_result}}
 
     def _export_as_document(self,source_data,doc_format:str,state:StudentState):
         if isinstance(source_data,list):
@@ -229,8 +236,8 @@ class StudentAgent():
             content=str(source_data)
             title="Document"
 
-        file_path=self.doc_writer.write(title=title,content=content,format=doc_format)
-        return {"document":{"title":title,"content":content,"format":doc_format,"file_path":file_path}}
+        doc_result=self.doc_writer.write(title=title,content=content,format=doc_format)
+        return {"document":{"title":title,"content":content,"format":doc_format,**doc_result}}
 
     # ──────────────────────────────────────────────
     # GRAPH BUILDER

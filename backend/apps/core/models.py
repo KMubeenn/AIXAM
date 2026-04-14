@@ -254,15 +254,6 @@ class Submission(models.Model):
         indexes = [
             models.Index(fields=['student', '-submitted_at']),
         ]
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    (Q(assignment__isnull=False) & Q(quiz__isnull=True)) |
-                    (Q(assignment__isnull=True) & Q(quiz__isnull=False))
-                ),
-                name="exactly_one_assessment"
-            )
-        ]
 
     def save(self, *args, **kwargs):
         # Auto-mark zero if late (SRS 2.2)

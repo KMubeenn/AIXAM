@@ -35,4 +35,6 @@ dependencies = [
     "langgraph>=1.0.8",
     "gunicorn>=25.0.3",
     "django-cors-headers>=4.9.0",
+    "fpdf2>=2.8.0",
+    "python-pptx>=1.0.0",
 ]

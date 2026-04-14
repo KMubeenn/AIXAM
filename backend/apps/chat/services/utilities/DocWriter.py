@@ -1,6 +1,6 @@
-import os
+import io
 import re
-from pathlib import Path
+import base64
 from datetime import datetime
 
 try:
@@ -24,29 +24,29 @@ except ImportError:
     PDF_AVAILABLE=False
 
 
-OUTPUT_DIR=Path(__file__).resolve().parent.parent.parent.parent / 'media' / 'generated_docs'
-
-
 class DocumentWriter():
-    def __init__(self):
-        OUTPUT_DIR.mkdir(parents=True,exist_ok=True)
 
     def _generate_filename(self,title:str,ext:str)->str:
         safe_title=re.sub(r'[^\w\s-]','',title).strip().replace(' ','_')[:50]
         timestamp=datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"{safe_title}_{timestamp}.{ext}"
 
-    def write(self,title:str,content:str,format:str)->str:
+    def write(self,title:str,content:str,format:str)->dict:
+        """Generate a document and return it as a base64-encoded dict.
+
+        Returns:
+            dict with keys: filename, file_base64, mime_type
+        """
         if format=='pdf':
-            return self.write_pdf(title,content)
+            return self._write_pdf(title,content)
         elif format=='docx':
-            return self.write_docx(title,content)
+            return self._write_docx(title,content)
         elif format=='pptx':
-            return self.write_pptx(title,content)
+            return self._write_pptx(title,content)
         else:
             raise ValueError(f"Unsupported format: {format}")
 
-    def write_pdf(self,title:str,content:str)->str:
+    def _write_pdf(self,title:str,content:str)->dict:
         if not PDF_AVAILABLE:
             raise ImportError("fpdf2 is required for PDF generation. Install with: pip install fpdf2")
 
@@ -78,12 +78,18 @@ class DocumentWriter():
                 pdf.set_font('Helvetica','',11)
                 pdf.multi_cell(0,6,line)
 
-        filename=self._generate_filename(title,'pdf')
-        file_path=str(OUTPUT_DIR / filename)
-        pdf.output(file_path)
-        return file_path
+        buffer=io.BytesIO()
+        pdf.output(buffer)
+        file_bytes=buffer.getvalue()
+        buffer.close()
 
-    def write_docx(self,title:str,content:str)->str:
+        return {
+            'filename':self._generate_filename(title,'pdf'),
+            'file_base64':base64.b64encode(file_bytes).decode('utf-8'),
+            'mime_type':'application/pdf'
+        }
+
+    def _write_docx(self,title:str,content:str)->dict:
         if not DOCX_AVAILABLE:
             raise ImportError("python-docx is required for DOCX generation.")
 
@@ -103,12 +109,18 @@ class DocumentWriter():
             else:
                 doc.add_paragraph(line)
 
-        filename=self._generate_filename(title,'docx')
-        file_path=str(OUTPUT_DIR / filename)
-        doc.save(file_path)
-        return file_path
+        buffer=io.BytesIO()
+        doc.save(buffer)
+        file_bytes=buffer.getvalue()
+        buffer.close()
 
-    def write_pptx(self,title:str,content:str)->str:
+        return {
+            'filename':self._generate_filename(title,'docx'),
+            'file_base64':base64.b64encode(file_bytes).decode('utf-8'),
+            'mime_type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        }
+
+    def _write_pptx(self,title:str,content:str)->dict:
         if not PPTX_AVAILABLE:
             raise ImportError("python-pptx is required for PPTX generation. Install with: pip install python-pptx")
 
@@ -141,7 +153,13 @@ class DocumentWriter():
                     p=tf.add_paragraph()
                     p.text=bp
 
-        filename=self._generate_filename(title,'pptx')
-        file_path=str(OUTPUT_DIR / filename)
-        prs.save(file_path)
-        return file_path
+        buffer=io.BytesIO()
+        prs.save(buffer)
+        file_bytes=buffer.getvalue()
+        buffer.close()
+
+        return {
+            'filename':self._generate_filename(title,'pptx'),
+            'file_base64':base64.b64encode(file_bytes).decode('utf-8'),
+            'mime_type':'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        }

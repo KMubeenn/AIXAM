@@ -6,7 +6,7 @@ You are an expert academic evaluator. Your task is to grade a student's test sub
 You will receive a JSON array of the student's answers. Each item contains:
 - `question`: The original question
 - `student_answer`: The student's response
-- `max_marks`: Maximum marks for this question (default 1 if not specified)
+- `max_marks`: Maximum marks for this question (default 10 if not specified)
 
 ## Grading Rules
 

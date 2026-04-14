@@ -34,14 +34,31 @@ async def agent_endpoint(request):
         memory=await chat_persistence.get_session_memory(session_id=session_id)
         agent.load_history(memory)
 
+        from apps.core.services import CoreService
+
         files=request.FILES.getlist("files")
+        study_material_id=None
         if files:
-            agent.load_document(files[0])
+            uploaded_file=files[0]
+            agent.load_document(uploaded_file)
+            file_ext=uploaded_file.name.rsplit('.',1)[-1].lower() if '.' in uploaded_file.name else ''
+            file_type_map={'pdf':'pdf','docx':'docx','pptx':'pptx','doc':'docx','ppt':'pptx'}
+            file_type=file_type_map.get(file_ext,'pdf')
+            material=await CoreService.save_study_material(
+                user_id=user.id,
+                title=uploaded_file.name,
+                file=uploaded_file,
+                file_type=file_type,
+                processed_content=agent.document_context or ''
+            )
+            study_material_id=str(material.id)
 
         message=[HumanMessage(content=data.get('message'))]
 
         grade_test=data.get('grade_test',False)
         test_submission=data.get('test_submission',None)
+        quiz_id=data.get('quiz_id',None)
+        grading_instructions=data.get('grading_instructions',None)
 
         response=StreamingHttpResponse(
             generate_response_with_persistence(
@@ -50,7 +67,10 @@ async def agent_endpoint(request):
                 message=message,
                 user_id=user.id,
                 grade_test=grade_test,
-                test_submission=test_submission
+                test_submission=test_submission,
+                study_material_id=study_material_id,
+                quiz_id=quiz_id,
+                grading_instructions=grading_instructions
             )
         )
         response['cache-control']='no-cache'
