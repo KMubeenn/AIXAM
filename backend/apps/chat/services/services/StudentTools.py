@@ -7,7 +7,7 @@ from typing import Literal
 VALID_TASKS=["flashcards","mock_test","mcq_mock_test","generate_pdf","generate_docx","generate_pptx"]
 
 
-class AgentTools():
+class StudentTools():
     @staticmethod
     @tool
     def plan_tasks(steps:list[dict]):
@@ -31,8 +31,8 @@ class AgentTools():
 
     @staticmethod
     def return_tools():
-        return [AgentTools.plan_tasks]
+        return [StudentTools.plan_tasks]
 
     @staticmethod
     def return_tool_node():
-        return ToolNode(AgentTools.return_tools())
+        return ToolNode(StudentTools.return_tools())

@@ -161,3 +161,101 @@ async def get_materials(request):
         return JsonResponse({'materials':materials})
     except Exception as e:
         return JsonResponse({'error':str(e)},status=500)
+
+# ──────────────────────────────────────────────
+# TEACHER ASSIGNMENTS
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_assignments(request):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        assignments = await CoreService.get_teacher_assignments(user.id)
+        return JsonResponse({'assignments': assignments})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_assignment_detail(request, assignment_id):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+            
+        from apps.core.models import Assignment
+        try:
+            assignment = await sync_to_async(Assignment.objects.get)(id=assignment_id, created_by_id=user.id)
+        except Assignment.DoesNotExist:
+            return JsonResponse({'error': 'Assignment not found'}, status=404)
+            
+        data = {
+            "id": str(assignment.id),
+            "title": assignment.title,
+            "description": assignment.description,
+            "course_id": assignment.course_id,
+            "deadline": assignment.deadline.isoformat() if assignment.deadline else None,
+            "total_marks": assignment.total_marks,
+            "created_at": assignment.created_at.isoformat()
+        }
+        
+        # If it has an attached quiz (for questions)
+        quiz_id = await sync_to_async(getattr)(assignment, 'quiz_id', None)
+        if quiz_id:
+            quiz_detail = await CoreService.get_quiz(quiz_id)
+            data["questions"] = quiz_detail.get('questions', [])
+            
+        return JsonResponse({'assignment': data})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(['DELETE'])
+async def delete_assignment_view(request, assignment_id):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+            
+        from apps.core.models import Assignment
+        deleted, _ = await sync_to_async(Assignment.objects.filter(id=assignment_id, created_by_id=user.id).delete)()
+        if deleted:
+            return JsonResponse({'message': 'Assignment deleted successfully'})
+        return JsonResponse({'error': 'Assignment not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_assignment_submissions(request, assignment_id):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+            
+        from apps.core.models import Submission, Assignment
+        try:
+            assignment = await sync_to_async(Assignment.objects.get)(id=assignment_id, created_by_id=user.id)
+        except Assignment.DoesNotExist:
+            return JsonResponse({'error': 'Assignment not found'}, status=404)
+            
+        submissions = await sync_to_async(list)(
+            Submission.objects.filter(assignment=assignment).select_related('student')
+        )
+        
+        data = [{
+            "id": str(s.id),
+            "student_id": str(s.student.id),
+            "student_name": s.student.username,
+            "score": s.score,
+            "feedback": s.feedback,
+            "is_late": s.is_late,
+            "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None
+        } for s in submissions]
+        
+        return JsonResponse({'submissions': data})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

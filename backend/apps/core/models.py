@@ -198,8 +198,27 @@ class Assignment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
     description = models.TextField()
-    course_id = models.CharField(max_length=100, help_text="Google Classroom Course ID")
-    deadline = models.DateTimeField()
+    course_id = models.CharField(max_length=100, blank=True, null=True, help_text="Google Classroom Course ID")
+    deadline = models.DateTimeField(blank=True, null=True)
+    total_marks = models.FloatField(default=100.0)
+    
+    quiz = models.ForeignKey(
+        Quiz,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assignments',
+        help_text="Optional quiz attached to this assignment"
+    )
+    study_material = models.ForeignKey(
+        StudyMaterial,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assignments',
+        help_text="Source material used to generate this assignment"
+    )
+    
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

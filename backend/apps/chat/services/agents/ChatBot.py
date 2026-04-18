@@ -15,6 +15,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
 from apps.chat.services.agents.student import StudentAgent
+from apps.chat.services.agents.teacher import TeacherAgent
 from apps.chat.services.agents.teacher import TeacherState
 from apps.chat.services.utilities.DocReader import DocumentReader
 from langchain.messages import SystemMessage,HumanMessage,AIMessageChunk
@@ -25,9 +26,9 @@ class Agent():
     system_prompt_path=Path(__file__).resolve().parent.parent / 'configs' / 'prompts' / 'system_prompt.md'
 
     def __init__(self,role:str,temperature:float=0.7):
-        self.agent=StudentAgent(temperature) if role=='student' else StudentAgent(temperature)
+        self.role = role
+        self.agent=StudentAgent(temperature) if role=='student' else TeacherAgent(temperature)
         self.agent_graph=self.agent.agent_builder()
-        self.confirmation_llm=init_chat_model("groq:llama-3.3-70b-versatile",temperature=0.7)
         self.history=[]
         self.document_context=None
 
@@ -63,6 +64,8 @@ class Agent():
         if grade_test and test_submission:
             state_input['grade_test']=True
             state_input['test_submission']=test_submission
+            state_input['grade_submissions']=True
+            state_input['student_submissions']=test_submission
             if grading_instructions:
                 state_input['grading_instructions']=grading_instructions
 
@@ -79,36 +82,32 @@ class Agent():
 
         final_state=(await self.agent_graph.aget_state(config)).values
 
-        task_done=[]
-        if final_state.get('flashcards'):
-            yield {"type":"flashcards","data":final_state['flashcards']}
-            task_done.append("flashcards")
-        if final_state.get('mock_test'):
-            yield {"type":"mock_test","data":final_state['mock_test']}
-            task_done.append("mock test")
-        if final_state.get('mcq_test'):
-            yield {"type":"mcq_test","data":final_state['mcq_test']}
-            task_done.append("MCQ test")
+        task_done = []
+        output_mappings = {
+            'flashcards': 'flashcards',
+            'mock_test': 'mock test',
+            'mcq_test': 'MCQ test',
+            'mock_test_grades': 'test grading',
+            'assignment': 'assignment',
+            'teacher_quiz': 'teacher quiz',
+            'slide_outline': 'slide outline',
+            'batch_grades': 'student grading'
+        }
+        
+        for key, description in output_mappings.items():
+            if final_state.get(key):
+                yield {"type": key, "data": final_state[key]}
+                task_done.append(description)
+                
         if final_state.get('document'):
-            yield {"type":"document","data":final_state['document']}
-            task_done.append(f"{final_state['document'].get('format','').upper()} document")
-        if final_state.get('mock_test_grades'):
-            yield {"type":"mock_test_grades","data":final_state['mock_test_grades']}
-            task_done.append("test grading")
+            yield {"type": "document", "data": final_state['document']}
+            doc_format = final_state['document'].get('format', '').upper()
+            task_done.append(f"{doc_format} document" if doc_format else "document")
 
         if task_done:
-            task_list=" and ".join(task_done)
-            user_msg=next(
-                msg for msg in reversed(input)
-                if isinstance(msg,HumanMessage)
-            )
-            prompt=SystemMessage(
-                content=f"You just successfully generated {task_list} for the user. "
-                        f"Write a brief, friendly confirmation message in 1-2 sentences."
-            )
-            async for chunk in self.confirmation_llm.astream([prompt,user_msg]):
-                if chunk.content:
-                    yield {"type":"token","content":chunk.content}
+            task_list = " and ".join(task_done)
+            confirm_msg = f"\nI have successfully generated your {task_list}! Let me know if you need anything else."
+            yield {"type": "token", "content": confirm_msg}
 
 
 

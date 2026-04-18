@@ -4,7 +4,8 @@ from apps.core.views import (
     get_quizzes,get_quiz_detail,delete_quiz_view,
     get_submissions,get_submission_detail,
     get_performance,
-    get_materials
+    get_materials,
+    get_assignments,get_assignment_detail,delete_assignment_view,get_assignment_submissions
 )
 
 urlpatterns = [
@@ -27,4 +28,10 @@ urlpatterns = [
 
     # Study Materials
     path('materials/',get_materials,name='materials'),
+
+    # Teacher Assignments
+    path('assignments/',get_assignments,name='assignments'),
+    path('assignments/<uuid:assignment_id>/',get_assignment_detail,name='assignment_detail'),
+    path('assignments/<uuid:assignment_id>/delete/',delete_assignment_view,name='delete_assignment'),
+    path('assignments/<uuid:assignment_id>/submissions/',get_assignment_submissions,name='assignment_submissions'),
 ]

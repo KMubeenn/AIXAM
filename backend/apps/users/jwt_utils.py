@@ -28,6 +28,7 @@ def generate_token(user) -> str:
         "user_id": user.id,
         "email": user.email,
         "username": user.username,
+        "role": user.role,
         "exp": (datetime.utcnow() + timedelta(days=TOKEN_EXPIRY_DAYS)).isoformat(),
     }
     
@@ -73,6 +74,21 @@ def get_user_from_request(request):
         User instance or None
     """
     from apps.users.models import User
+    
+def get_payload_from_request(request):
+    """
+    Extremely fast extractor that ONLY decodes the JWT payload.
+    Does NOT query the database or Redis.
+    Use this when you ONLY need to check the user's ID or Role.
+    """
+    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+    try:
+        return validate_token(token)
+    except Exception:
+        return None
     
     auth_header = request.META.get("HTTP_AUTHORIZATION", "")
     print(f"[AuthDebug] Header: {auth_header[:20]}...")

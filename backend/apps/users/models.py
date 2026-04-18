@@ -34,6 +34,8 @@ class User(AbstractUser):
     
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='student')
     google_id = models.CharField(max_length=255, blank=True, null=True, unique=True, help_text="Google OAuth2 ID")
+    google_access_token = models.TextField(blank=True, null=True, help_text="Google OAuth Access Token")
+    google_refresh_token = models.TextField(blank=True, null=True, help_text="Google OAuth Refresh Token")
     profile_picture = models.URLField(max_length=500, blank=True, null=True, help_text="URL to user's profile picture")
     
     class Meta:

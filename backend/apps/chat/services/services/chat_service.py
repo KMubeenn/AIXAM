@@ -96,8 +96,30 @@ async def _persist_structured_output(user_id,output,session_id,study_material_id
                 score=score_pct
             )
             return str(submission.id)
-        elif output_type=='document':
+        elif output_type=='document' or output_type=='slide_outline':
             return None
+        elif output_type=='assignment':
+            return await CoreService.save_assignment(
+                user_id=user_id,
+                title=data.get('title', f"{topic} Assignment"),
+                description=f"Generated assignment for {topic}",
+                questions=data.get('questions', []),
+                total_marks=data.get('total_marks', 100),
+                study_material_id=study_material_id
+            )
+        elif output_type=='teacher_quiz':
+            return await CoreService.save_teacher_quiz(
+                user_id=user_id,
+                title=f"{topic} Teacher Quiz",
+                questions=data,
+                study_material_id=study_material_id
+            )
+        elif output_type=='batch_grades':
+            return await CoreService.save_batch_grades(
+                teacher_id=user_id,
+                assignment_id=quiz_id,
+                grades_data=data
+            )
     except Exception as e:
         print(f"[CorePersistence] Failed to save {output_type}: {e}")
         return None

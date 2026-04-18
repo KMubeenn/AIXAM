@@ -279,3 +279,146 @@ class CoreService:
             'strength_score':p.strength_score,
             'last_updated':p.last_updated.isoformat()
         } for p in perfs]
+
+    # ──────────────────────────────────────────────
+    # TEACHER AGENT SPECIFIC SERVICES
+    # ──────────────────────────────────────────────
+
+    @staticmethod
+    @sync_to_async
+    def save_assignment(user_id, title, description, questions, deadline=None, total_marks=100.0, study_material_id=None, course_id=None):
+        from apps.core.models import Assignment, Quiz, Question
+        
+        quiz = Quiz.objects.create(
+            title=f"Questions for {title}",
+            description="Auto-generated backend for assignment",
+            quiz_type='assignment_quiz',
+            study_material_id=study_material_id,
+            created_by_id=user_id
+        )
+        
+        q_objs = []
+        for q in questions:
+            q_text = f"{q.get('question', '')} \n\nRUBRIC: {q.get('rubric', '')}"
+            marks = q.get('marks', 1.0)
+            q_objs.append(Question(
+                quiz=quiz,
+                text=q_text,
+                question_type='descriptive',
+                points=marks
+            ))
+        if q_objs:
+            Question.objects.bulk_create(q_objs)
+            
+        assignment = Assignment.objects.create(
+            title=title,
+            description=description,
+            created_by_id=user_id,
+            deadline=deadline,
+            total_marks=total_marks,
+            study_material_id=study_material_id,
+            course_id=course_id,
+            quiz=quiz
+        )
+        return str(assignment.id)
+
+    @staticmethod
+    @sync_to_async
+    def save_teacher_quiz(user_id, title, questions, study_material_id=None):
+        from apps.core.models import Quiz, Question, Choice
+        
+        quiz = Quiz.objects.create(
+            title=title,
+            quiz_type='assignment_quiz',
+            study_material_id=study_material_id,
+            created_by_id=user_id
+        )
+        
+        for q in questions:
+            q_obj = Question.objects.create(
+                quiz=quiz,
+                text=f"{q.get('question', '')} \n\nEXPLANATION: {q.get('explanation', '')}",
+                question_type='mcq',
+                points=q.get('points', 1)
+            )
+            choices_to_create = []
+            correct_key = q.get('answer', '').upper()
+            options = q.get('options', {})
+            for key, val in options.items():
+                is_correct = (key.upper() == correct_key)
+                choices_to_create.append(Choice(
+                    question=q_obj,
+                    text=f"{key}) {val}",
+                    is_correct=is_correct
+                ))
+            if choices_to_create:
+                Choice.objects.bulk_create(choices_to_create)
+                
+        return str(quiz.id)
+
+    @staticmethod
+    @sync_to_async
+    def save_batch_grades(teacher_id, assignment_id, grades_data):
+        from apps.core.models import Submission, Assignment, StudentPerformance
+        from apps.users.models import User
+        try:
+            assignment = Assignment.objects.get(id=assignment_id)
+        except:
+            return None
+            
+        grades = grades_data.get('grades', [])
+        
+        student_scores = {}
+        student_feedback = {}
+        for g in grades:
+            sid = g.get('student_id')
+            if not sid:
+                continue
+            student_scores[sid] = student_scores.get(sid, 0) + g.get('marks', 0)
+            fb = g.get('feedback', '')
+            if fb:
+                student_feedback[sid] = student_feedback.get(sid, '') + "\n" + fb
+                
+        for sid, total_score in student_scores.items():
+            try:
+                student = User.objects.get(id=sid)
+                Submission.objects.update_or_create(
+                    student=student,
+                    assignment=assignment,
+                    defaults={
+                        'score': total_score,
+                        'feedback': student_feedback.get(sid, '').strip(),
+                        'quiz': assignment.quiz
+                    }
+                )
+                
+                # Update generic performance
+                perf, created = StudentPerformance.objects.get_or_create(
+                    student=student,
+                    topic=assignment.title,
+                    defaults={'average_score': total_score, 'tests_taken': 1, 'strength_score': total_score}
+                )
+                if not created:
+                    total = perf.average_score * perf.tests_taken
+                    perf.tests_taken += 1
+                    perf.average_score = (total + total_score) / perf.tests_taken
+                    perf.strength_score = perf.average_score
+                    perf.save(update_fields=['average_score', 'tests_taken', 'strength_score', 'last_updated'])
+            except:
+                pass
+                
+        return str(assignment_id)
+
+    @staticmethod
+    @sync_to_async
+    def get_teacher_assignments(user_id):
+        from apps.core.models import Assignment
+        assignments = list(Assignment.objects.filter(created_by_id=user_id).order_by('-created_at')[:50])
+        return [{
+            "id": str(a.id),
+            "title": a.title,
+            "course_id": a.course_id,
+            "deadline": a.deadline.isoformat() if a.deadline else None,
+            "total_marks": a.total_marks,
+            "created_at": a.created_at.isoformat()
+        } for a in assignments]

@@ -5,7 +5,7 @@ from typing import TypedDict
 from pathlib import Path
 
 from apps.chat.services.services.History import History
-from apps.chat.services.services.Tools import AgentTools
+from apps.chat.services.services.StudentTools import StudentTools
 from apps.chat.services.utilities.DocWriter import DocumentWriter
 from langchain.messages import HumanMessage, AIMessageChunk
 from langgraph.graph import StateGraph,START,END
@@ -67,7 +67,7 @@ class StudentAgent():
     def __init__(self,temperature:float = 0.7):
         self.temperature=temperature
         base_llm=init_chat_model("groq:llama-3.3-70b-versatile",temperature=self.temperature)
-        self.llm=base_llm.bind_tools(AgentTools.return_tools())
+        self.llm=base_llm.bind_tools(StudentTools.return_tools())
         self.flashcard_llm=base_llm.with_structured_output(FlashCardSet)
         self.mock_test_llm=base_llm.with_structured_output(MockTestSet)
         self.mcq_llm=base_llm.with_structured_output(McqTestSet)
@@ -247,7 +247,7 @@ class StudentAgent():
         agent_builder=StateGraph(StudentState)
 
         agent_builder.add_node("llm_call",self.conversation)
-        agent_builder.add_node("tool_node",AgentTools.return_tool_node())
+        agent_builder.add_node("tool_node",StudentTools.return_tool_node())
         agent_builder.add_node("orchestrator",self.orchestrator)
         agent_builder.add_node("grade_mock_test_node",self.grade_mock_test)
 

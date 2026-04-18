@@ -8,7 +8,7 @@ from apps.chat.services.services.ChatPersistence import ChatPersistenceService,P
 from apps.chat.services.services.chat_service import generate_response_with_persistence
 from apps.chat.models import ChatSession
 from apps.chat.services.agents.ChatBot import Agent
-from apps.users.jwt_utils import get_user_from_request
+from apps.users.jwt_utils import get_payload_from_request
 from asgiref.sync import sync_to_async 
 
 from langchain.messages import HumanMessage
@@ -21,11 +21,16 @@ async def agent_endpoint(request):
     try:
         chat_persistence=ChatPersistenceService()
         data=json.loads(request.body)
-        user=await sync_to_async(get_user_from_request)(request=request)
-        role=data.get('role','student')
+        user_payload = await sync_to_async(get_payload_from_request)(request)
+        if not user_payload:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+            
+        user_id = user_payload.get("user_id")
+        # JWT payload inherently trusts the stored role now
+        role = user_payload.get("role", data.get("role", "student"))
 
         if data.get("create_session"):
-            session_id=await chat_persistence.create_session(user_id=user.id)
+            session_id=await chat_persistence.create_session(user_id=user_id)
         else:
             session_id=data.get('session_id')
 
@@ -45,7 +50,7 @@ async def agent_endpoint(request):
             file_type_map={'pdf':'pdf','docx':'docx','pptx':'pptx','doc':'docx','ppt':'pptx'}
             file_type=file_type_map.get(file_ext,'pdf')
             material=await CoreService.save_study_material(
-                user_id=user.id,
+                user_id=user_id,
                 title=uploaded_file.name,
                 file=uploaded_file,
                 file_type=file_type,
@@ -54,7 +59,7 @@ async def agent_endpoint(request):
             study_material_id=str(material.id)
 
         message=[HumanMessage(content=data.get('message'))]
-
+        
         grade_test=data.get('grade_test',False)
         test_submission=data.get('test_submission',None)
         quiz_id=data.get('quiz_id',None)
@@ -65,7 +70,7 @@ async def agent_endpoint(request):
                 chat_agent=agent,
                 session_id=session_id,
                 message=message,
-                user_id=user.id,
+                user_id=user_id,
                 grade_test=grade_test,
                 test_submission=test_submission,
                 study_material_id=study_material_id,
