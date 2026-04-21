@@ -57,7 +57,6 @@ async def agent_endpoint(request):
             material=await CoreService.save_study_material(
                 user_id=user_id,
                 title=uploaded_file.name,
-                file=uploaded_file,
                 file_type=file_type,
                 processed_content=agent.document_context or ''
             )

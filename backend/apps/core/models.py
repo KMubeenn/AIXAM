@@ -17,7 +17,7 @@ class StudyMaterial(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
-    file = models.FileField(upload_to='study_materials/')
+    file = models.FileField(upload_to='study_materials/', blank=True, null=True)
     file_type = models.CharField(
         max_length=10,
         choices=[('pdf', 'PDF'), ('pptx', 'PPTX'), ('docx', 'DOCX')]

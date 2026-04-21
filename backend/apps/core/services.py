@@ -15,10 +15,9 @@ class CoreService:
 
     @staticmethod
     @sync_to_async
-    def save_study_material(user_id,title,file,file_type,processed_content=''):
+    def save_study_material(user_id,title,file_type,processed_content=''):
         return StudyMaterial.objects.create(
             title=title,
-            file=file,
             file_type=file_type,
             uploaded_by_id=user_id,
             processed_content=processed_content
