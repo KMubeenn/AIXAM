@@ -20,7 +20,11 @@ import json
 async def agent_endpoint(request):
     try:
         chat_persistence=ChatPersistenceService()
-        data=json.loads(request.body)
+        # Handle both multipart/form-data (file uploads) and application/json
+        if request.content_type and 'multipart' in request.content_type:
+            data = request.POST
+        else:
+            data = json.loads(request.body)
         user_payload = await sync_to_async(get_payload_from_request)(request)
         if not user_payload:
             return JsonResponse({'error': 'Unauthorized'}, status=401)
@@ -45,6 +49,7 @@ async def agent_endpoint(request):
         study_material_id=None
         if files:
             uploaded_file=files[0]
+            print(f"[FileUpload] File received: '{uploaded_file.name}' | Size: {uploaded_file.size} bytes | Content-Type: {uploaded_file.content_type}")
             agent.load_document(uploaded_file)
             file_ext=uploaded_file.name.rsplit('.',1)[-1].lower() if '.' in uploaded_file.name else ''
             file_type_map={'pdf':'pdf','docx':'docx','pptx':'pptx','doc':'docx','ppt':'pptx'}

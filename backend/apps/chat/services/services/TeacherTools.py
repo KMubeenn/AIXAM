@@ -15,7 +15,9 @@ class TeacherTools():
     @staticmethod
     @tool
     def plan_tasks(steps: list[dict]):
-        """Plan the tasks needed to fulfill the teacher's request.
+        """CRITICAL: ONLY use this tool if the teacher explicitly asks to generate an assignment, a quiz, or slides. If the teacher asks a normal question, is greeting you, or having a general conversation, DO NOT use this tool and reply directly to them.
+
+        Plan the tasks needed to fulfill the teacher's request.
         Return a list of steps where each step is a dict with:
         - step: int (sequential step number starting from 1)
         - task: one of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx"

@@ -11,11 +11,19 @@ class StudentTools():
     @staticmethod
     @tool
     def plan_tasks(steps:list[dict]):
-        """Plan the tasks needed to fulfill the user's request.
+        """CRITICAL: ONLY use this tool if the user explicitly asks to generate study materials, mock tests, or flashcards. If the user asks a normal question, is greeting you, or having a conversation, DO NOT use this tool and reply directly to them.
+
+        Plan the tasks needed to fulfill the user's request.
         Return a list of steps where each step is a dict with:
         - step: int (sequential step number starting from 1)
         - task: one of "flashcards", "mock_test", "mcq_mock_test", "generate_pdf", "generate_docx", "generate_pptx"
         - depends_on: int or null. If this task needs the output of a previous step (e.g. exporting generated MCQs as a PDF), set this to that step number. Otherwise null.
+
+        IMPORTANT - Task disambiguation:
+        - "mock_test" = open-ended descriptive questions ONLY.
+        - "mcq_mock_test" = multiple-choice questions ONLY.
+        - If the user says "mock mcq test", "mcq mock test", "multiple choice mock test", or "mcq test", they want ONLY ONE task: "mcq_mock_test". Do NOT create both "mock_test" and "mcq_mock_test".
+        - Only create BOTH tasks if the user explicitly says they want both open-ended AND multiple-choice questions (e.g. "give me a descriptive mock test AND an MCQ test").
 
         Rules:
         - Steps execute in order.
@@ -26,6 +34,8 @@ class StudentTools():
         Examples:
         - "Generate flashcards on Python" -> [{"step": 1, "task": "flashcards", "depends_on": null}]
         - "MCQs on LLM in PDF and a mock test" -> [{"step": 1, "task": "mcq_mock_test", "depends_on": null}, {"step": 2, "task": "generate_pdf", "depends_on": 1}, {"step": 3, "task": "mock_test", "depends_on": null}]
+        - "mock mcq test on AI" -> [{"step": 1, "task": "mcq_mock_test", "depends_on": null}]
+        - "mcq mock test with 10 questions" -> [{"step": 1, "task": "mcq_mock_test", "depends_on": null}]
         """
         return json.dumps(steps)
 

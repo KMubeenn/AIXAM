@@ -45,6 +45,7 @@ class Agent():
         reader=DocumentReader()
         chunks=reader.read(file,filename=file.name)
         self.document_context="\n\n".join(chunks)
+        print(f"[FileUpload] File read complete: {len(chunks)} chunk(s) extracted | Total chars in context: {len(self.document_context)}")
 
     async def run(self,input:list,id:int,grade_test=False,test_submission=None,grading_instructions=None):
         system_prompt=Agent.build_prompt()

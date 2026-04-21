@@ -110,7 +110,20 @@ class TeacherAgent:
         if state.get('files_input'):
              messages.append(SystemMessage(content=f"Available Reference Material:\n{state.get('files_input')}"))
         messages.extend(state['messages'])
-        response = self.llm.invoke(messages)
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.llm.invoke(messages)
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"[TeacherAgent] LLM call failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
+                    continue
+                else:
+                    print(f"[TeacherAgent] LLM call failed after {max_retries} attempts: {e}")
+                    raise
+        
         return {"messages": [response]}
 
     def should_use_tool(self, state: TeacherState):

@@ -91,7 +91,20 @@ class StudentAgent():
         if state.get('files_input'):
             file_context=SystemMessage(content=f"The user has uploaded a document. Its content is available for reference:\n\n{state['files_input']}")
             messages.insert(1,file_context)
-        response=self.llm.invoke(messages)
+        
+        max_retries=3
+        for attempt in range(max_retries):
+            try:
+                response=self.llm.invoke(messages)
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"[StudentAgent] LLM call failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
+                    continue
+                else:
+                    print(f"[StudentAgent] LLM call failed after {max_retries} attempts: {e}")
+                    raise
+        
         current_calls=state.get('llm_calls',0)
         return {"messages":response,"llm_calls":current_calls+1}
 

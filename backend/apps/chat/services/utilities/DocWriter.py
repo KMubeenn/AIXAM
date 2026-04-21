@@ -31,6 +31,51 @@ class DocumentWriter():
         timestamp=datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"{safe_title}_{timestamp}.{ext}"
 
+    def _sanitize_for_pdf(self, text: str) -> str:
+        """
+        Replace unsupported Unicode characters with ASCII equivalents.
+        FPDF2's built-in Helvetica font only supports Latin-1 (ISO 8859-1).
+        Zero-width characters are valid latin-1 but have 0 glyph width, crashing FPDF.
+        """
+        replacements = {
+            '\u2013': '-',    # en dash
+            '\u2014': '--',   # em dash
+            '\u2018': "'",    # left single quote
+            '\u2019': "'",    # right single quote
+            '\u201c': '"',    # left double quote
+            '\u201d': '"',    # right double quote
+            '\u2022': '*',    # bullet
+            '\u2026': '...', # ellipsis
+            '\u2192': '->',  # right arrow
+            '\u2190': '<-',  # left arrow
+            '\u2191': '^',   # up arrow
+            '\u2193': 'v',   # down arrow
+            '\u00b7': '*',   # middle dot
+            '\u00a0': ' ',   # non-breaking space
+            '\u2665': '<3',  # heart
+            '\u2713': '[OK]',# checkmark
+            '\u00d7': 'x',   # multiplication sign
+            '\u00b0': 'deg', # degree sign
+            '\u00b1': '+/-', # plus-minus
+            # Zero-width characters — valid latin-1 but 0 glyph width → FPDF crash
+            '\u200b': '',    # zero-width space
+            '\u200c': '',    # zero-width non-joiner
+            '\u200d': '',    # zero-width joiner
+            '\u200e': '',    # left-to-right mark
+            '\u200f': '',    # right-to-left mark
+            '\ufeff': '',    # BOM / zero-width no-break space
+            '\u00ad': '',    # soft hyphen
+        }
+        for char, replacement in replacements.items():
+            text = text.replace(char, replacement)
+        # Strip markdown bold/italic markers before rendering
+        import re as _re
+        text = _re.sub(r'\*{1,3}', '', text)   # remove *, **, ***
+        text = _re.sub(r'_{1,2}', '', text)     # remove _, __
+        text = _re.sub(r'`+', '', text)          # remove backticks
+        # Final fallback: keep only printable latin-1 characters
+        return ''.join(c if ord(c) < 256 and ord(c) >= 32 else '?' for c in text)
+
     def write(self,title:str,content:str,format:str)->dict:
         """Generate a document and return it as a base64-encoded dict.
 
@@ -59,24 +104,42 @@ class DocumentWriter():
         pdf.ln(8)
 
         for line in content.split('\n'):
-            line=line.strip()
+            line = self._sanitize_for_pdf(line.strip())
             if not line:
                 pdf.ln(4)
-            elif line.startswith('## '):
-                pdf.set_font('Helvetica','B',14)
-                pdf.cell(0,10,line[3:],new_x="LMARGIN",new_y="NEXT")
-                pdf.ln(2)
-            elif line.startswith('# '):
-                pdf.set_font('Helvetica','B',16)
-                pdf.cell(0,10,line[2:],new_x="LMARGIN",new_y="NEXT")
-                pdf.ln(3)
-            elif line.startswith('- ') or line.startswith('* '):
-                pdf.set_font('Helvetica','',11)
-                pdf.cell(10)
-                pdf.multi_cell(0,6,f"\u2022 {line[2:]}")
-            else:
-                pdf.set_font('Helvetica','',11)
-                pdf.multi_cell(0,6,line)
+                continue
+            try:
+                # Always reset cursor to left margin before any multi_cell
+                pdf.set_x(pdf.l_margin)
+                if line.startswith('### '):
+                    pdf.set_font('Helvetica', 'B', 12)
+                    pdf.multi_cell(0, 8, line[4:])
+                    pdf.ln(1)
+                elif line.startswith('## '):
+                    pdf.set_font('Helvetica', 'B', 14)
+                    pdf.multi_cell(0, 10, line[3:])
+                    pdf.ln(2)
+                elif line.startswith('# '):
+                    pdf.set_font('Helvetica', 'B', 16)
+                    pdf.multi_cell(0, 10, line[2:])
+                    pdf.ln(3)
+                elif line.startswith('- ') or line.startswith('* '):
+                    pdf.set_font('Helvetica', '', 11)
+                    pdf.multi_cell(0, 6, f"  * {line[2:]}")
+                else:
+                    pdf.set_font('Helvetica', '', 11)
+                    pdf.multi_cell(0, 6, line)
+            except Exception:
+                # If a line still fails to render, skip it gracefully
+                pdf.set_x(pdf.l_margin)
+                pdf.set_font('Helvetica', '', 11)
+                try:
+                    # Last resort: render only pure ASCII
+                    safe = ''.join(c if 32 <= ord(c) < 128 else '?' for c in line)
+                    if safe.strip():
+                        pdf.multi_cell(0, 6, safe)
+                except Exception:
+                    pdf.ln(6)  # skip and move to next line
 
         buffer=io.BytesIO()
         pdf.output(buffer)
