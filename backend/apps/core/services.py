@@ -34,6 +34,21 @@ class CoreService:
             'created_at':m.created_at.isoformat()
         } for m in materials]
 
+    @staticmethod
+    @sync_to_async
+    def get_material_detail(material_id):
+        try:
+            m = StudyMaterial.objects.get(id=material_id)
+            return {
+                'id': str(m.id),
+                'title': m.title,
+                'file_type': m.file_type,
+                'content': m.processed_content,
+                'created_at': m.created_at.isoformat()
+            }
+        except StudyMaterial.DoesNotExist:
+            raise ValueError("Material not found")
+
     # ──────────────────────────────────────────────
     # FLASHCARDS
     # ──────────────────────────────────────────────

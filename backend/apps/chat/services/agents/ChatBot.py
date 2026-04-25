@@ -47,9 +47,14 @@ class Agent():
         self.document_context="\n\n".join(chunks)
         print(f"[FileUpload] File read complete: {len(chunks)} chunk(s) extracted | Total chars in context: {len(self.document_context)}")
 
-    async def run(self,input:list,id:int,grade_test=False,test_submission=None,grading_instructions=None):
+    def load_text_context(self, text: str):
+        """Load pre-processed text directly from the database."""
+        self.document_context = text
+        print(f"[ContextLoad] Loaded {len(text)} chars from existing study material.")
+
+    async def run(self,input:list,id:str,grade_test=False,test_submission=None,grading_instructions=None,user_id=None):
         system_prompt=Agent.build_prompt()
-        config={'configurable':{'thread_id':id}}
+        config={'configurable':{'thread_id':id, 'user_id': user_id}}
 
         messages=self.history+input
 

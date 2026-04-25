@@ -244,3 +244,106 @@ def me(request):
     return JsonResponse({
         "user": user_to_dict(user),
     })
+
+# ──────────────────────────────────────────────
+# GOOGLE CLASSROOM OAUTH
+# ──────────────────────────────────────────────
+
+import os
+from django.shortcuts import redirect
+import json
+
+def _get_google_flow():
+    from google_auth_oauthlib.flow import Flow
+    client_config = {
+        "web": {
+            "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
+            "project_id": "aixam-classroom",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+            "redirect_uris": [os.environ.get("GOOGLE_REDIRECT_URI", "")],
+        }
+    }
+    scopes = [
+        'https://www.googleapis.com/auth/classroom.courses.readonly',
+        'https://www.googleapis.com/auth/classroom.coursework.students',
+        'https://www.googleapis.com/auth/classroom.announcements'
+    ]
+    return Flow.from_client_config(
+        client_config, 
+        scopes=scopes, 
+        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "")
+    )
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def google_classroom_login(request):
+    """
+    Generate the OAuth URL and redirect the user to Google.
+    Must provide Authorization Header to link teacher account.
+    """
+    user = get_user_from_request(request)
+    if not user:
+        # For simplicity, if accessed via browser, UI passing token in query string
+        auth_token = request.GET.get('token')
+        if auth_token:
+            from apps.users.jwt_utils import validate_token
+            payload = validate_token(auth_token)
+            if payload:
+                user = User.objects.filter(id=payload['user_id']).first()
+    
+    if not user:
+        return JsonResponse({"error": "Unauthorized or missing token query parameter"}, status=401)
+        
+    flow = _get_google_flow()
+    auth_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent'
+    )
+    
+    # Store state & user ID temporarily in django session
+    request.session['google_oauth_state'] = state
+    request.session['google_oauth_user_id'] = str(user.id)
+    request.session.modified = True
+    
+    return redirect(auth_url)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def google_classroom_callback(request):
+    """
+    Handle Google's redirect containing the auth code.
+    Exchange code for tokens and save to User model.
+    """
+    state_from_request = request.GET.get('state')
+    state_from_session = request.session.get('google_oauth_state')
+    user_id = request.session.get('google_oauth_user_id')
+    
+    if not user_id:
+        return JsonResponse({"error": "OAuth session expired. Try again."}, status=400)
+    
+    try:
+        flow = _get_google_flow()
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+        
+        credentials = flow.credentials
+        
+        # Save tokens
+        user = User.objects.get(id=user_id)
+        user.google_access_token = credentials.token
+        user.google_refresh_token = credentials.refresh_token if credentials.refresh_token else user.google_refresh_token
+        user.save(update_fields=['google_access_token', 'google_refresh_token'])
+        
+        # Clear session
+        if 'google_oauth_state' in request.session: del request.session['google_oauth_state']
+        if 'google_oauth_user_id' in request.session: del request.session['google_oauth_user_id']
+        
+        # Redirect back to frontend
+        return JsonResponse({"message": "Google Classroom connected successfully!"})
+        
+    except Exception as e:
+        return JsonResponse({"error": f"OAuth exchange failed: {e}"}, status=500)

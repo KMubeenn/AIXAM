@@ -4,7 +4,7 @@ from apps.core.views import (
     get_quizzes,get_quiz_detail,delete_quiz_view,
     get_submissions,get_submission_detail,
     get_performance,
-    get_materials,
+    get_materials, get_material_detail,
     get_assignments,get_assignment_detail,delete_assignment_view,get_assignment_submissions
 )
 
@@ -28,6 +28,7 @@ urlpatterns = [
 
     # Study Materials
     path('materials/',get_materials,name='materials'),
+    path('materials/<str:material_id>/',get_material_detail,name='material_detail'),
 
     # Teacher Assignments
     path('assignments/',get_assignments,name='assignments'),

@@ -162,6 +162,23 @@ async def get_materials(request):
     except Exception as e:
         return JsonResponse({'error':str(e)},status=500)
 
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_material_detail(request, material_id):
+    try:
+        user=await sync_to_async(get_user_from_request)(request=request)
+        if not user:
+            return JsonResponse({'error':'Unauthorized'},status=401)
+        data = await CoreService.get_material_detail(material_id)
+        return JsonResponse(data)
+    except ValueError as e:
+        return JsonResponse({'error':str(e)},status=404)
+    except Exception as e:
+        if "is not a valid UUID" in str(e):
+            return JsonResponse({'error': 'Invalid material ID format'},status=400)
+        return JsonResponse({'error':str(e)},status=500)
+
 # ──────────────────────────────────────────────
 # TEACHER ASSIGNMENTS
 # ──────────────────────────────────────────────

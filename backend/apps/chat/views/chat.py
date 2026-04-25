@@ -46,7 +46,8 @@ async def agent_endpoint(request):
         from apps.core.services import CoreService
 
         files=request.FILES.getlist("files")
-        study_material_id=None
+        study_material_id = data.get('study_material_id', None)
+        
         if files:
             uploaded_file=files[0]
             print(f"[FileUpload] File received: '{uploaded_file.name}' | Size: {uploaded_file.size} bytes | Content-Type: {uploaded_file.content_type}")
@@ -61,6 +62,16 @@ async def agent_endpoint(request):
                 processed_content=agent.document_context or ''
             )
             study_material_id=str(material.id)
+        elif study_material_id:
+            # User referenced an old document
+            try:
+                from apps.core.models import StudyMaterial
+                from asgiref.sync import sync_to_async
+                material = await sync_to_async(StudyMaterial.objects.get)(id=study_material_id)
+                if material and material.processed_content:
+                    agent.load_text_context(material.processed_content)
+            except Exception as e:
+                print(f"[Chat] Failed to load existing study material {study_material_id}: {e}")
 
         message=[HumanMessage(content=data.get('message'))]
         

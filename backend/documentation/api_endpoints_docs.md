@@ -15,10 +15,10 @@ The token is obtained from the login or register response. The token encodes the
 
 ---
 
-## 1. Users & Authentication (`/api/users/`)
+## 1. Users & Authentication (`/api/auth/`)
 
 ### 1.1 Register
-**POST** `/api/users/register/`
+**POST** `/api/auth/signup/`
 
 **Request Body (JSON):**
 | Field | Type | Required | Notes |
@@ -65,7 +65,7 @@ The token is obtained from the login or register response. The token encodes the
 ---
 
 ### 1.2 Login
-**POST** `/api/users/login/`
+**POST** `/api/auth/login/`
 
 **Request Body (JSON):**
 | Field | Type | Required |
@@ -102,7 +102,7 @@ The token is obtained from the login or register response. The token encodes the
 ---
 
 ### 1.3 Get Current User
-**GET** `/api/users/me/`
+**GET** `/api/auth/me/`
 - **Headers:** `Authorization: Bearer <token>`
 
 **Response (200 OK):**
@@ -116,6 +116,25 @@ The token is obtained from the login or register response. The token encodes the
         "date_joined": "2026-04-21T10:00:00Z",
         "last_login": "2026-04-21T12:00:00Z"
     }
+}
+```
+
+---
+
+### 1.4 Connect Google Classroom (Login)
+**GET** `/api/auth/google/login/`
+- **Headers:** `Authorization: Bearer <token>`
+- **Action:** Redirects the user to the Google Consent Screen to grant Classroom access. 
+
+---
+
+### 1.5 Google Classroom Callback (Backend Only)
+**GET** `/api/auth/google/callback/`
+- **Action:** The system automatically redirects the user back here. The backend exchanges the OAuth code for credentials, saves them to the User model, and redirects the user to the frontend dashboard.
+- **Response (200 OK):**
+```json
+{
+    "message": "Google Classroom connected successfully!"
 }
 ```
 
@@ -196,7 +215,20 @@ Send as `multipart/form-data`:
 
 ---
 
-### 2.6 Use Case: Grade a Student Test Submission
+### 2.6 Use Case: Generate From Existing Library Document
+Instead of uploading a file again, you can pass the ID of a previously uploaded document. The backend will instantly pull the extracted text from the database.
+Send as `raw JSON`:
+```json
+{
+    "session_id": "47ffa3aa-8c24-479d-a2ee-0cf9bef1640e",
+    "study_material_id": "f8a731b9-1234-5678-abcd-ef0123456789",
+    "message": "Generate a 10 question quiz from this document."
+}
+```
+
+---
+
+### 2.7 Use Case: Grade a Student Test Submission
 ```json
 {
     "session_id": "47ffa3aa-8c24-479d-a2ee-0cf9bef1640e",
@@ -222,7 +254,7 @@ Send as `multipart/form-data`:
 
 ---
 
-### 2.7 Use Case: Teacher — Generate Assignment / Quiz / Slides
+### 2.8 Use Case: Teacher — Generate Assignment / Quiz / Slides
 The backend automatically detects the teacher's role from the JWT token. Simply send a natural language request:
 ```json
 {
@@ -239,7 +271,7 @@ The backend automatically detects the teacher's role from the JWT token. Simply 
 
 ---
 
-### 2.8 Streaming Response Format
+### 2.9 Streaming Response Format
 
 The response is a **text stream**. Each chunk is a JSON string terminated by `\n`. The frontend should parse each line as a JSON object.
 

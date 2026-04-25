@@ -24,7 +24,7 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
         topic = await extractor.extract_topic(query)
         await chat_persistence.set_title(session_id=session_id,message=topic)
 
-    async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions):
+    async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions,user_id=user_id):
         if output["type"]=="token":
             full_response.append(output["content"])
             yield output["content"]

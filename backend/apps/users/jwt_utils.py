@@ -75,21 +75,6 @@ def get_user_from_request(request):
     """
     from apps.users.models import User
     
-def get_payload_from_request(request):
-    """
-    Extremely fast extractor that ONLY decodes the JWT payload.
-    Does NOT query the database or Redis.
-    Use this when you ONLY need to check the user's ID or Role.
-    """
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-    if not auth_header.startswith("Bearer "):
-        return None
-    token = auth_header[7:]
-    try:
-        return validate_token(token)
-    except Exception:
-        return None
-    
     auth_header = request.META.get("HTTP_AUTHORIZATION", "")
     print(f"[AuthDebug] Header: {auth_header[:20]}...")
     
@@ -117,8 +102,6 @@ def get_payload_from_request(request):
         if RedisService.is_available():
             cached = RedisService.get_user(user_id)
             if cached:
-                # Reconstruct a minimal user object from cache
-                # We need to fetch full user for model methods, but cache hit is logged
                 print(f"[Auth] User cache HIT for user_id: {user_id}")
     except ImportError:
         pass
@@ -142,6 +125,21 @@ def get_payload_from_request(request):
         return user
     except User.DoesNotExist:
         print(f"[AuthDebug] User {user_id} not found in DB")
+        return None
+
+def get_payload_from_request(request):
+    """
+    Extremely fast extractor that ONLY decodes the JWT payload.
+    Does NOT query the database or Redis.
+    Use this when you ONLY need to check the user's ID or Role.
+    """
+    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+    try:
+        return validate_token(token)
+    except Exception:
         return None
 
 

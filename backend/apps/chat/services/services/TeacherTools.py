@@ -1,6 +1,7 @@
 import json
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode
+from langchain_core.runnables import RunnableConfig
 
 VALID_TEACHER_TASKS = [
     "assignment",
@@ -38,8 +39,103 @@ class TeacherTools():
 
     @staticmethod
     def return_tools():
-        return [TeacherTools.plan_tasks]
+        return [
+            TeacherTools.plan_tasks,
+            TeacherTools.list_google_courses,
+            TeacherTools.post_google_assignment,
+            TeacherTools.post_google_announcement,
+            TeacherTools.get_google_submissions
+        ]
 
     @staticmethod
     def return_tool_node():
         return ToolNode(TeacherTools.return_tools())
+
+    # ──────────────────────────────────────────────
+    # GOOGLE CLASSROOM TOOLS
+    # ──────────────────────────────────────────────
+    
+    @staticmethod
+    @tool
+    def list_google_courses(config: RunnableConfig) -> str:
+        """
+        List all Google Classroom courses the teacher is currently managing.
+        Returns the course ID, name, and description.
+        """
+        try:
+            from apps.users.models import User
+            from apps.chat.services.utilities.ClassroomService import ClassroomService
+            user_id = config.get("configurable", {}).get("user_id")
+            if not user_id: return "Error: User ID not found in context."
+            user = User.objects.get(id=user_id)
+            
+            courses = ClassroomService.list_courses(user)
+            return json.dumps(courses)
+        except Exception as e:
+            return f"Failed to list Google courses: {e}"
+
+    @staticmethod
+    @tool
+    def post_google_assignment(course_id: str, title: str, description: str, max_points: float, config: RunnableConfig) -> str:
+        """
+        Create and publish a new assignment directly into a specific Google Classroom course.
+        Args:
+            course_id: The ID of the course (obtained via list_google_courses).
+            title: Title of the assignment.
+            description: Detailed instructions for the assignment.
+            max_points: Max grade points (e.g. 100).
+        """
+        try:
+            from apps.users.models import User
+            from apps.chat.services.utilities.ClassroomService import ClassroomService
+            user_id = config.get("configurable", {}).get("user_id")
+            if not user_id: return "Error: User ID not found in context."
+            user = User.objects.get(id=user_id)
+            
+            result = ClassroomService.post_assignment(user, course_id, title, description, max_points)
+            return f"Successfully created assignment! Details: {json.dumps(result)}"
+        except Exception as e:
+            return f"Failed to post assignment to Google Classroom: {e}"
+
+    @staticmethod
+    @tool
+    def post_google_announcement(course_id: str, text: str, config: RunnableConfig) -> str:
+        """
+        Post a public announcement or message to the Google Classroom course stream.
+        Args:
+            course_id: The ID of the course.
+            text: The announcement content.
+        """
+        try:
+            from apps.users.models import User
+            from apps.chat.services.utilities.ClassroomService import ClassroomService
+            user_id = config.get("configurable", {}).get("user_id")
+            if not user_id: return "Error: User ID not found in context."
+            user = User.objects.get(id=user_id)
+            
+            result = ClassroomService.post_announcement(user, course_id, text)
+            return f"Announcement posted successfully. ID: {result.get('id')}"
+        except Exception as e:
+            return f"Failed to post announcement: {e}"
+
+    @staticmethod
+    @tool
+    def get_google_submissions(course_id: str, coursework_id: str, config: RunnableConfig) -> str:
+        """
+        Fetch all student submissions for a specific assignment (coursework) in a Google Classroom.
+        This provides the studentName, submission state, and assignedGrade. Useful BEFORE mass-grading.
+        Args:
+            course_id: The ID of the course.
+            coursework_id: The ID of the assignment/coursework.
+        """
+        try:
+            from apps.users.models import User
+            from apps.chat.services.utilities.ClassroomService import ClassroomService
+            user_id = config.get("configurable", {}).get("user_id")
+            if not user_id: return "Error: User ID not found in context."
+            user = User.objects.get(id=user_id)
+            
+            submissions = ClassroomService.get_submissions(user, course_id, coursework_id)
+            return json.dumps(submissions)
+        except Exception as e:
+            return f"Failed to fetch submissions: {e}"
