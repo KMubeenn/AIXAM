@@ -282,32 +282,35 @@ def _get_google_flow():
 def google_classroom_login(request):
     """
     Generate the OAuth URL and redirect the user to Google.
-    Must provide Authorization Header to link teacher account.
+    Must provide Authorization Header or ?token= to link teacher account.
     """
-    user = get_user_from_request(request)
-    if not user:
-        # For simplicity, if accessed via browser, UI passing token in query string
-        auth_token = request.GET.get('token')
-        if auth_token:
-            from apps.users.jwt_utils import validate_token
-            payload = validate_token(auth_token)
-            if payload:
-                user = User.objects.filter(id=payload['user_id']).first()
+    auth_token = None
     
-    if not user:
-        return JsonResponse({"error": "Unauthorized or missing token query parameter"}, status=401)
+    # Check Header first
+    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    if auth_header.startswith("Bearer "):
+        auth_token = auth_header[7:]
+    
+    # Fallback to GET param
+    if not auth_token:
+        auth_token = request.GET.get('token')
+        
+    if not auth_token:
+        return JsonResponse({"error": "Unauthorized. Missing token in Header or Query Parameter."}, status=401)
+        
+    # Validate token to ensure user exists
+    from apps.users.jwt_utils import validate_token
+    payload = validate_token(auth_token)
+    if not payload:
+        return JsonResponse({"error": "Token invalid or expired."}, status=401)
         
     flow = _get_google_flow()
-    auth_url, state = flow.authorization_url(
+    auth_url, _ = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
-        prompt='consent'
+        prompt='consent',
+        state=auth_token  # Pass JWT as state for stateless callback!
     )
-    
-    # Store state & user ID temporarily in django session
-    request.session['google_oauth_state'] = state
-    request.session['google_oauth_user_id'] = str(user.id)
-    request.session.modified = True
     
     return redirect(auth_url)
 
@@ -319,14 +322,20 @@ def google_classroom_callback(request):
     Handle Google's redirect containing the auth code.
     Exchange code for tokens and save to User model.
     """
-    state_from_request = request.GET.get('state')
-    state_from_session = request.session.get('google_oauth_state')
-    user_id = request.session.get('google_oauth_user_id')
+    auth_token = request.GET.get('state')
     
-    if not user_id:
-        return JsonResponse({"error": "OAuth session expired. Try again."}, status=400)
+    if not auth_token:
+        return JsonResponse({"error": "OAuth state missing. Try again."}, status=400)
+    
+    from apps.users.jwt_utils import validate_token
+    payload = validate_token(auth_token)
+    if not payload:
+        return JsonResponse({"error": "OAuth state token invalid or expired."}, status=401)
+        
+    user_id = payload['user_id']
     
     try:
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
         flow = _get_google_flow()
         flow.fetch_token(authorization_response=request.build_absolute_uri())
         
@@ -338,12 +347,28 @@ def google_classroom_callback(request):
         user.google_refresh_token = credentials.refresh_token if credentials.refresh_token else user.google_refresh_token
         user.save(update_fields=['google_access_token', 'google_refresh_token'])
         
-        # Clear session
-        if 'google_oauth_state' in request.session: del request.session['google_oauth_state']
-        if 'google_oauth_user_id' in request.session: del request.session['google_oauth_user_id']
-        
         # Redirect back to frontend
         return JsonResponse({"message": "Google Classroom connected successfully!"})
         
     except Exception as e:
         return JsonResponse({"error": f"OAuth exchange failed: {e}"}, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def google_classroom_courses(request):
+    """
+    Direct endpoint for the frontend to list connected Google Classroom courses.
+    Requires Authorization Header.
+    """
+    user = get_user_from_request(request)
+    if not user:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+        
+    try:
+        from apps.chat.services.utilities.ClassroomService import ClassroomService
+        courses = ClassroomService.list_courses(user)
+        return JsonResponse({"courses": courses})
+    except Exception as e:
+        if "has not authorized" in str(e):
+            return JsonResponse({"error": "Google Classroom not connected"}, status=403)
+        return JsonResponse({"error": str(e)}, status=500)
