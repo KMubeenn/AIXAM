@@ -9,6 +9,7 @@ from langgraph.graph import StateGraph, START, END
 from apps.chat.services.agents.agent_state import BaseState, Document
 from apps.chat.services.services.TeacherTools import TeacherTools, VALID_TEACHER_TASKS
 from apps.chat.services.utilities.DocWriter import DocumentWriter
+from apps.chat.services.services.History import History
 
 
 class AssignmentQuestion(TypedDict, total=False):
@@ -84,6 +85,7 @@ class TeacherAgent:
         self.slide_outline_llm = base_llm.with_structured_output(SlideOutline)
         self.grading_llm = base_llm.with_structured_output(BatchGradingResult)
         self.doc_llm = base_llm
+        self.memory = History()
 
     @staticmethod
     def load_task_prompt(filename: str):
@@ -219,13 +221,20 @@ class TeacherAgent:
         return {"document": doc_writer.write(content, title, format_type)}
 
     def orchestrator(self, state: TeacherState):
-        last_message = state['messages'][-1]
         llm_calls = state.get('llm_calls', 0)
-        
-        if not last_message.tool_calls:
+
+        # Walk back through messages to find the last AIMessage with tool_calls
+        from langchain.messages import AIMessage
+        last_ai_message = None
+        for msg in reversed(state['messages']):
+            if isinstance(msg, AIMessage) and getattr(msg, 'tool_calls', None):
+                last_ai_message = msg
+                break
+
+        if not last_ai_message:
             return {"llm_calls": llm_calls}
-            
-        tool_call = last_message.tool_calls[0]
+
+        tool_call = last_ai_message.tool_calls[0]
         if tool_call['name'] != "plan_tasks":
             return {"llm_calls": llm_calls}
             
@@ -281,6 +290,18 @@ class TeacherAgent:
             
         return final_state
 
+    def after_tool_router(self, state: TeacherState):
+        """After a tool runs, route plan_tasks to orchestrator and everything else back to llm_call."""
+        from langchain.messages import AIMessage
+        for msg in reversed(state['messages']):
+            if isinstance(msg, AIMessage) and getattr(msg, 'tool_calls', None):
+                tool_name = msg.tool_calls[0]['name']
+                if tool_name == 'plan_tasks':
+                    return "orchestrator"
+                else:
+                    return "llm_call"  # Let LLM read the tool result and respond
+        return "orchestrator"
+
     def agent_builder(self):
         builder = StateGraph(TeacherState)
 
@@ -303,7 +324,10 @@ class TeacherAgent:
             "pass": END
         })
 
-        builder.add_edge("tool_node", "orchestrator")
+        builder.add_conditional_edges("tool_node", self.after_tool_router, {
+            "orchestrator": "orchestrator",
+            "llm_call": "llm_call"
+        })
         builder.add_edge("orchestrator", END)
 
-        return builder.compile()
+        return builder.compile(checkpointer=self.memory)

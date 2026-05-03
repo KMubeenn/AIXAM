@@ -304,13 +304,25 @@ def google_classroom_login(request):
     if not payload:
         return JsonResponse({"error": "Token invalid or expired."}, status=401)
         
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
     flow = _get_google_flow()
     auth_url, _ = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
         prompt='consent',
-        state=auth_token  # Pass JWT as state for stateless callback!
     )
+    
+    # Encode both JWT and code_verifier into state so callback can recover them
+    code_verifier = getattr(flow, 'code_verifier', None) or ''
+    combined_state = f"{auth_token}|||{code_verifier}"
+    
+    # Rebuild auth_url with our combined state
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+    parsed = urlparse(auth_url)
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    params['state'] = [combined_state]
+    new_query = urlencode(params, doseq=True)
+    auth_url = urlunparse(parsed._replace(query=new_query))
     
     return redirect(auth_url)
 
@@ -322,10 +334,12 @@ def google_classroom_callback(request):
     Handle Google's redirect containing the auth code.
     Exchange code for tokens and save to User model.
     """
-    auth_token = request.GET.get('state')
+    combined_state = request.GET.get('state', '')
     
-    if not auth_token:
-        return JsonResponse({"error": "OAuth state missing. Try again."}, status=400)
+    if '|||' not in combined_state:
+        return JsonResponse({"error": "OAuth state missing or malformed. Try again."}, status=400)
+    
+    auth_token, code_verifier = combined_state.split('|||', 1)
     
     from apps.users.jwt_utils import validate_token
     payload = validate_token(auth_token)
@@ -337,6 +351,11 @@ def google_classroom_callback(request):
     try:
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
         flow = _get_google_flow()
+        
+        # Restore the code_verifier so PKCE exchange succeeds
+        if code_verifier:
+            flow.code_verifier = code_verifier
+        
         flow.fetch_token(authorization_response=request.build_absolute_uri())
         
         credentials = flow.credentials

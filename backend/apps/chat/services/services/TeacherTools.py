@@ -76,14 +76,14 @@ class TeacherTools():
 
     @staticmethod
     @tool
-    def post_google_assignment(course_id: str, title: str, description: str, max_points: float, config: RunnableConfig) -> str:
+    def post_google_assignment(course_id: str, title: str, description: str, max_points: str, config: RunnableConfig) -> str:
         """
         Create and publish a new assignment directly into a specific Google Classroom course.
         Args:
             course_id: The ID of the course (obtained via list_google_courses).
             title: Title of the assignment.
             description: Detailed instructions for the assignment.
-            max_points: Max grade points (e.g. 100).
+            max_points: Max grade points as a string e.g. "100".
         """
         try:
             from apps.users.models import User
@@ -92,7 +92,7 @@ class TeacherTools():
             if not user_id: return "Error: User ID not found in context."
             user = User.objects.get(id=user_id)
             
-            result = ClassroomService.post_assignment(user, course_id, title, description, max_points)
+            result = ClassroomService.post_assignment(user, course_id, title, description, float(max_points))
             return f"Successfully created assignment! Details: {json.dumps(result)}"
         except Exception as e:
             return f"Failed to post assignment to Google Classroom: {e}"

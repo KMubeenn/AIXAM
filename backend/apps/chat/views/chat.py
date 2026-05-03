@@ -66,7 +66,6 @@ async def agent_endpoint(request):
             # User referenced an old document
             try:
                 from apps.core.models import StudyMaterial
-                from asgiref.sync import sync_to_async
                 material = await sync_to_async(StudyMaterial.objects.get)(id=study_material_id)
                 if material and material.processed_content:
                     agent.load_text_context(material.processed_content)
@@ -105,6 +104,12 @@ async def agent_endpoint(request):
         return JsonResponse({'error':"internal server error",
         'message':'internal server error'}
         ,status=500)
+    except Exception as e:
+        import traceback
+        print("=== UNHANDLED CHAT ERROR ===")
+        traceback.print_exc()
+        print("============================")
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 
