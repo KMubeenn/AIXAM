@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
 import {
   ChatService,
   ChatMessage,
@@ -115,6 +116,7 @@ export const useChat = () => {
 
 export const useSessions = () => {
   const queryClient = useQueryClient();
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
 
   const sessionsQuery = useQuery({
     queryKey: ["chat-sessions"],
@@ -123,14 +125,47 @@ export const useSessions = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ChatService.deleteSession(id),
+    onMutate: async (id) => {
+      // Small delay before "hiding" it optimistically
+      const timeoutId = setTimeout(() => {
+        setHiddenIds(prev => new Set(prev).add(id));
+      }, 500);
+      return { timeoutId };
+    },
+    onError: (err, id, context) => {
+      if (context?.timeoutId) clearTimeout(context.timeoutId);
+      setHiddenIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast.error("Failed to delete chat session. Please try again.");
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chat-sessions"] });
+      toast.success("Chat deleted successfully");
     },
+    onSettled: (data, error, id, context) => {
+      if (context?.timeoutId) clearTimeout(context.timeoutId);
+      // Clean up the hidden ID once the real data refresh is likely done
+      setTimeout(() => {
+        setHiddenIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 1000);
+    }
   });
 
+  const sessions = sessionsQuery.data?.user_sessions || [];
+  const visibleSessions = sessions.filter(s => !hiddenIds.has(s.id));
+
   return {
-    sessions: sessionsQuery.data?.user_sessions || [],
+    sessions: visibleSessions,
     isLoading: sessionsQuery.isLoading,
     deleteSession: deleteMutation.mutate,
+    isDeleting: deleteMutation.isPending,
+    deletingId: deleteMutation.variables
   };
 };

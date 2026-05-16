@@ -6,18 +6,14 @@ import Sidebar from "../StudentDashboard/components/Sidebar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-// Module-level: persists across React 18 StrictMode's double-invoke
-// (mount → unmount → remount). A new Set<string> per quiz_id ensures
-// the grading request fires exactly once per navigation.
-const _firedGradingIds = new Set<string>();
-
 const Chat: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { messages, isStreaming, sendMessage, setMessages, loadSession, setSessionId } = useChat();
+  const { messages, isStreaming, sendMessage, setMessages, loadSession, setSessionId, sessionId } = useChat();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const gradingFiredRef = useRef<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -28,20 +24,22 @@ const Chat: React.FC = () => {
   }, [messages]);
 
   // Auto-fire grading request ONCE when arriving from quiz modal.
-  // Guards:
-  //   1. _firedGradingIds (module-level Set) — survives StrictMode remount
-  //   2. navigate(..., replace+null state) — clears React Router's location so
-  //      any future remount reads no gradeRequest at all
   useEffect(() => {
-    const gradeRequest = (location.state as any)?.gradeRequest;
+    const state = location.state as any;
+    const gradeRequest = state?.gradeRequest;
+    
     if (!gradeRequest?.quiz_id) return;
 
-    // Already fired for this quiz_id — StrictMode second-mount guard
-    if (_firedGradingIds.has(gradeRequest.quiz_id)) return;
-    _firedGradingIds.add(gradeRequest.quiz_id);
+    // StrictMode double-mount guard: check if we already fired for THIS mount cycle
+    if (gradingFiredRef.current === gradeRequest.quiz_id) return;
+    gradingFiredRef.current = gradeRequest.quiz_id;
 
-    // Clear React Router's state so back-navigation won't replay this
+    // 1. Clear Router State: prevents replay on back-navigation
     navigate(location.pathname, { replace: true, state: null });
+
+    // 2. Clear Session State: ensures a fresh chat for every test attempt
+    setMessages([]);
+    setSessionId(null);
 
     const msg =
       `Please grade my answers for the test "${gradeRequest.quiz_title}":\n\n` +
@@ -51,15 +49,17 @@ const Chat: React.FC = () => {
         )
         .join('\n\n');
 
+    // 3. Fire Request: explicitly set session_id to null to force create_session
     sendMessage({
       message: msg,
       grade_test: true,
       quiz_id: gradeRequest.quiz_id,
+      session_id: null,
       test_submission: gradeRequest.test_submission,
       grading_instructions: gradeRequest.grading_instructions,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location.state]);
 
   const handleSend = () => {
     if (!input.trim() || isStreaming) return;
@@ -117,7 +117,7 @@ const Chat: React.FC = () => {
         </header>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-800">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
               <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4">

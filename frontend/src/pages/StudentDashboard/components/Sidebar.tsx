@@ -28,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
-  const { sessions, deleteSession } = useSessions();
+  const { sessions, deleteSession, isDeleting, deletingId, isLoading: isSessionsLoading } = useSessions();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
@@ -62,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
         <Link
           to="/student-dashboard"
           className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
@@ -101,19 +101,29 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
                 <LuPlus className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-1 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
-              {sessions.length === 0 ? (
+            <div className="space-y-1 max-h-[30vh] overflow-y-auto pr-2 no-scrollbar">
+              {isSessionsLoading ? (
+                <div className="px-4 py-2 space-y-2">
+                  <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded animate-pulse w-3/4"></div>
+                  <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded animate-pulse w-1/2"></div>
+                </div>
+              ) : sessions.length === 0 ? (
                 <p className="px-4 py-2 text-xs text-gray-400 dark:text-slate-600 italic">No recent chats</p>
               ) : (
                 sessions.map((session: any) => (
                   <div key={session.id} className="group relative">
                     <button
-                      onClick={() => onSessionSelect?.(session.id)}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-xs font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left truncate pr-8"
-                    >
-                      <LuHistory className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="truncate">{session.title || 'Untitled Chat'}</span>
-                    </button>
+                       onClick={() => onSessionSelect?.(session.id)}
+                       disabled={isDeleting && deletingId === session.id}
+                       className={`w-full flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors text-left truncate pr-8 ${
+                         isDeleting && deletingId === session.id 
+                           ? "bg-red-50 dark:bg-red-900/20 text-red-600 animate-pulse" 
+                           : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800"
+                       }`}
+                     >
+                       <LuHistory className={`w-3.5 h-3.5 flex-shrink-0 ${isDeleting && deletingId === session.id ? "animate-spin" : ""}`} />
+                       <span className="truncate">{session.title || 'Untitled Chat'}</span>
+                     </button>
                     <button 
                       onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"

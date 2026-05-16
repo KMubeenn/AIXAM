@@ -45,4 +45,49 @@
   .markdown-content strong {
     @apply font-bold;
   }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .aixam-toast {
+    overflow: hidden;
+    position: relative;
+    animation: slide-in-right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  }
+
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%) !important;
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0) !important;
+      opacity: 1;
+    }
+  }
+
+  .aixam-toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.3);
+    animation: toast-progress 4s linear forwards;
+    transform-origin: left;
+  }
+
+  @keyframes toast-progress {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
 }
