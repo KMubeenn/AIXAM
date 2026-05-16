@@ -6,6 +6,7 @@ import logoWhiteImg from "../../assets/logo/logo_white.png";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import { useAuthStore } from "../../store/useAuthStore";
 import { AuthService } from "../../services/auth.service";
 
 const LoginS: React.FC = () => {
@@ -14,33 +15,21 @@ const LoginS: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
 
   React.useEffect(() => {
-    const checkSession = async () => {
-      const token = AuthService.getToken();
-      if (!token) return;
-
-      try {
-        const data = await AuthService.getProfile();
-        const user = data.user;
-
-        if (user && user.role === "student") {
-          navigate("/student-dashboard");
-        } else if (user && user.role === "teacher") {
-          // Wrong portal, clear session
-          AuthService.logout();
-          setError(
-            "This account is for Teachers. Please use the Teacher Login.",
-          );
-        }
-      } catch (err) {
-        // Invalid token
-        AuthService.logout();
+    if (isAuthenticated && user) {
+      if (user.role === "student") {
+        navigate("/student-dashboard");
+      } else if (user.role === "teacher") {
+        clearAuth();
+        setError("This account is for Teachers. Please use the Teacher Login.");
       }
-    };
-
-    checkSession();
-  }, [navigate]);
+    }
+  }, [isAuthenticated, user, navigate, clearAuth]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -50,17 +39,13 @@ const LoginS: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      const response = await AuthService.login(
-        formData.email,
-        formData.password,
-      );
+      const response = await AuthService.login(formData);
       const user = response.user;
 
       if (user.role === "student") {
+        setAuth(user, response.token);
         navigate("/student-dashboard");
       } else {
-        // Logged in successfully but wrong portal
-        AuthService.logout(); // Clear session
         setError("This account is for Teachers. Please use the Teacher Login.");
       }
     } catch (err: any) {

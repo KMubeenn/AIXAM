@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import StudentDashboard from "./pages/StudentDashboard/StudentDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard/TeacherDashboard";
 import AnalyticsDashboard from "./pages/Analytics/Analytics";
+import Chat from "./pages/Chat/Chat";
 
 import AuthLayout from "./layouts/AuthLayout";
 
@@ -21,6 +22,7 @@ const App: React.FC = () => {
         <Route path="/student-dashboard" element={<StudentDashboard />} />
         <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
+        <Route path="/chat" element={<Chat />} />
 
         {/* Auth Routes */}
 

@@ -66,5 +66,6 @@ USE_TZ = True
 TIME_ZONE = "UTC"
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ["X-Session-Id"]
 
 

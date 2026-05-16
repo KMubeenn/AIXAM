@@ -1,8 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { LuGraduationCap, LuPresentation } from "react-icons/lu";
+import { LuGraduationCap, LuPresentation, LuArrowRight } from "react-icons/lu";
+import { useAuthStore } from "../../../store/useAuthStore";
 
 const Hero: React.FC = () => {
+  const { isAuthenticated, user } = useAuthStore();
+  const dashboardPath = user?.role === 'teacher' ? "/teacher-dashboard" : "/student-dashboard";
+
   return (
     <section className="relative pt-20 pb-24 lg:pt-32 lg:pb-40 overflow-hidden">
       <div className="absolute inset-0 -z-10">
@@ -26,24 +30,36 @@ const Hero: React.FC = () => {
         </p>
 
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Link
-            to="/login-student"
-            className="group relative px-8 py-4 bg-indigo-600 text-white rounded-full font-semibold text-lg shadow-lg shadow-indigo-200 dark:shadow-indigo-900/50 hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]"
-          >
-            <span className="flex items-center justify-center gap-2">
-              I'm a Student
-              <LuGraduationCap className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-            </span>
-          </Link>
-          <Link
-            to="/login-teacher"
-            className="group relative px-8 py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-full font-semibold text-lg shadow-sm hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]"
-          >
-            <span className="flex items-center justify-center gap-2">
-              I'm a Teacher
-              <LuPresentation className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            </span>
-          </Link>
+          {isAuthenticated ? (
+            <Link
+              to={dashboardPath}
+              className="group relative px-10 py-5 bg-indigo-600 text-white rounded-full font-bold text-xl shadow-xl shadow-indigo-200 dark:shadow-indigo-900/50 hover:bg-indigo-700 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 w-full sm:w-auto flex items-center justify-center gap-3"
+            >
+              Go to Your Dashboard
+              <LuArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/login-student"
+                className="group relative px-8 py-4 bg-indigo-600 text-white rounded-full font-semibold text-lg shadow-lg shadow-indigo-200 dark:shadow-indigo-900/50 hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  I'm a Student
+                  <LuGraduationCap className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                </span>
+              </Link>
+              <Link
+                to="/login-teacher"
+                className="group relative px-8 py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-full font-semibold text-lg shadow-sm hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto min-w-[200px]"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  I'm a Teacher
+                  <LuPresentation className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                </span>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Social Proof / Trust */}

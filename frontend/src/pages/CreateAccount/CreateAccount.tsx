@@ -33,12 +33,12 @@ const CreateAccount: React.FC = () => {
         throw new Error("Please select a valid role");
       }
 
-      await AuthService.signup(
-        formData.name,
-        formData.email,
-        formData.password,
-        formData.role.toLowerCase(),
-      );
+      await AuthService.signup({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role.toLowerCase(),
+      });
 
       // Redirect to specific login page based on role
       if (formData.role.toLowerCase() === "student") {

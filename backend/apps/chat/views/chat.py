@@ -33,7 +33,11 @@ async def agent_endpoint(request):
         # JWT payload inherently trusts the stored role now
         role = user_payload.get("role", data.get("role", "student"))
 
-        if data.get("create_session"):
+        create_session = data.get("create_session")
+        if isinstance(create_session, str):
+            create_session = create_session.lower() == 'true'
+
+        if create_session:
             session_id=await chat_persistence.create_session(user_id=user_id)
         else:
             session_id=data.get('session_id')
@@ -74,7 +78,10 @@ async def agent_endpoint(request):
 
         message=[HumanMessage(content=data.get('message'))]
         
-        grade_test=data.get('grade_test',False)
+        grade_test = data.get('grade_test', False)
+        if isinstance(grade_test, str):
+            grade_test = grade_test.lower() == 'true'
+            
         test_submission=data.get('test_submission',None)
         quiz_id=data.get('quiz_id',None)
         grading_instructions=data.get('grading_instructions',None)
@@ -95,7 +102,7 @@ async def agent_endpoint(request):
         response['cache-control']='no-cache'
         response['connection']='keep-alive'
         response['X-Accel-Buffering']='no'
-        response['X-Session_id']=str(session_id)
+        response['X-Session-Id']=str(session_id)
         return response 
     except PersistenceServiceError as e:
         print("chat endpoint failed ",str(e))

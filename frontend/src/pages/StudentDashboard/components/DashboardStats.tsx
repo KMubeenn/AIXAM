@@ -1,6 +1,10 @@
 import { LuTarget, LuCirclePlay, LuTrendingUp } from "react-icons/lu";
+import { usePerformance } from "../../../hooks/useCore";
 
 const DashboardStats: React.FC = () => {
+  const { data, isLoading } = usePerformance();
+  const stats = data?.performance;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Today's Focus */}
@@ -14,11 +18,10 @@ const DashboardStats: React.FC = () => {
             </span>
           </div>
           <h2 className="text-3xl font-bold mb-2">
-            Molecular Biology & Genetics
+            Welcome Back!
           </h2>
           <p className="text-indigo-100 mb-6 max-w-lg">
-            Complete Chapter 4 revision and attempt the practice quiz before 5
-            PM. You're 75% through this module.
+            {isLoading ? "Loading your progress..." : `You have completed ${stats?.total_submissions || 0} submissions so far. Your average score is ${stats?.average_score?.toFixed(1) || 0}%.`}
           </p>
 
           <div className="flex flex-wrap gap-3">
@@ -36,58 +39,42 @@ const DashboardStats: React.FC = () => {
       {/* Quick Stats / Progress */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
         <h3 className="font-bold text-gray-900 dark:text-white mb-4">
-          Weekly Progress
+          Performance Overview
         </h3>
         <div className="space-y-4">
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <p className="text-gray-600 dark:text-slate-400">Physics</p>
-              <p className="font-medium text-gray-900 dark:text-white">85%</p>
+              <p className="text-gray-600 dark:text-slate-400">Average Score</p>
+              <p className="font-medium text-gray-900 dark:text-white">{stats?.average_score?.toFixed(1) || 0}%</p>
             </div>
             <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
               <div
                 className="bg-blue-500 h-2 rounded-full"
-                style={{ width: "85%" }}
+                style={{ width: `${stats?.average_score || 0}%` }}
               ></div>
             </div>
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="text-gray-600 dark:text-slate-400">
-                Chemistry
+                Submissions
               </span>
               <span className="font-medium text-gray-900 dark:text-white">
-                62%
+                {stats?.total_submissions || 0}
               </span>
             </div>
             <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
               <div
                 className="bg-green-500 h-2 rounded-full"
-                style={{ width: "62%" }}
-              ></div>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600 dark:text-slate-400">
-                Mathematics
-              </span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                40%
-              </span>
-            </div>
-            <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
-              <div
-                className="bg-orange-500 h-2 rounded-full"
-                style={{ width: "40%" }}
+                style={{ width: `${Math.min((stats?.total_submissions || 0) * 10, 100)}%` }}
               ></div>
             </div>
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-sm text-gray-500 dark:text-slate-500">
-          <span>12 hrs studied this week</span>
-          <span className="text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
-            <LuTrendingUp className="w-3 h-3" /> +15%
+          <span>Trend: {stats?.improvement_trend || 'N/A'}</span>
+          <span className={`${stats?.improvement_trend === 'positive' ? 'text-green-600 dark:text-green-400' : 'text-orange-600'} font-medium flex items-center gap-1 uppercase text-xs`}>
+            <LuTrendingUp className="w-3 h-3" /> {stats?.improvement_trend}
           </span>
         </div>
       </div>
