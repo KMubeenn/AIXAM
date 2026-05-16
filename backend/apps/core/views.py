@@ -104,12 +104,28 @@ async def delete_quiz_view(request,quiz_id):
 # ──────────────────────────────────────────────
 
 @csrf_exempt
-@require_http_methods(['GET'])
+@require_http_methods(['GET', 'POST'])
 async def get_submissions(request):
     try:
         user=await sync_to_async(get_user_from_request)(request=request)
         if not user:
             return JsonResponse({'error':'Unauthorized'},status=401)
+
+        if request.method == 'POST':
+            body = json.loads(request.body)
+            quiz_id = body.get('quiz_id')
+            score = body.get('score', 0)
+            feedback = body.get('feedback', '')
+            if not quiz_id:
+                return JsonResponse({'error': 'quiz_id is required'}, status=400)
+            submission = await CoreService.save_submission(
+                student_id=user.id,
+                quiz_id=quiz_id,
+                score=score,
+                feedback=feedback
+            )
+            return JsonResponse({'id': str(submission.id), 'message': 'Submission saved'}, status=201)
+
         submissions=await CoreService.get_user_submissions(user.id)
         return JsonResponse({'submissions':submissions})
     except Exception as e:

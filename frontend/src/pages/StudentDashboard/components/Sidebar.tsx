@@ -129,21 +129,21 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
 
         <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-800">
           <Link
-            to="#"
+            to="/study-materials"
             className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-xl font-medium transition-colors"
           >
             <LuCloudUpload className="w-5 h-5" />
             Upload Materials
           </Link>
           <Link
-            to="#"
+            to="/flashcards"
             className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-xl font-medium transition-colors"
           >
             <LuLayers className="w-5 h-5" />
             Flashcards
           </Link>
           <Link
-            to="#"
+            to="/mock-tests"
             className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-xl font-medium transition-colors"
           >
             <LuFileCheck className="w-5 h-5" />

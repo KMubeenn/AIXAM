@@ -33,7 +33,7 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
                 record_id=await _persist_structured_output(user_id,output,session_id,study_material_id,quiz_id)
                 if record_id:
                     output['record_id']=record_id
-            yield json.dumps(output)
+            yield f"\n{json.dumps(output)}\n"
 
     response=''.join(full_response)
     if response:

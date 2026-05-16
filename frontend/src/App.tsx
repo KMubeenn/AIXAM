@@ -4,6 +4,9 @@ import StudentDashboard from "./pages/StudentDashboard/StudentDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard/TeacherDashboard";
 import AnalyticsDashboard from "./pages/Analytics/Analytics";
 import Chat from "./pages/Chat/Chat";
+import FlashcardsPage from "./pages/Flashcards/FlashcardsPage";
+import MockTestsPage from "./pages/MockTests/MockTestsPage";
+import StudyMaterialsPage from "./pages/StudyMaterials/StudyMaterialsPage";
 
 import AuthLayout from "./layouts/AuthLayout";
 
@@ -23,6 +26,9 @@ const App: React.FC = () => {
         <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/flashcards" element={<FlashcardsPage />} />
+        <Route path="/mock-tests" element={<MockTestsPage />} />
+        <Route path="/study-materials" element={<StudyMaterialsPage />} />
 
         {/* Auth Routes */}
 

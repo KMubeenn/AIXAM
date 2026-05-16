@@ -1,13 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FiSend, FiPaperclip, FiArrowLeft, FiMoreVertical } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { FiSend, FiPaperclip, FiArrowLeft, FiMoreVertical, FiLayers, FiFileText, FiCheckCircle, FiDownload } from "react-icons/fi";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useChat } from "../../hooks/useChat";
 import Sidebar from "../StudentDashboard/components/Sidebar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+// Module-level: persists across React 18 StrictMode's double-invoke
+// (mount → unmount → remount). A new Set<string> per quiz_id ensures
+// the grading request fires exactly once per navigation.
+const _firedGradingIds = new Set<string>();
+
 const Chat: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { messages, isStreaming, sendMessage, setMessages, loadSession, setSessionId } = useChat();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -20,6 +26,40 @@ const Chat: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-fire grading request ONCE when arriving from quiz modal.
+  // Guards:
+  //   1. _firedGradingIds (module-level Set) — survives StrictMode remount
+  //   2. navigate(..., replace+null state) — clears React Router's location so
+  //      any future remount reads no gradeRequest at all
+  useEffect(() => {
+    const gradeRequest = (location.state as any)?.gradeRequest;
+    if (!gradeRequest?.quiz_id) return;
+
+    // Already fired for this quiz_id — StrictMode second-mount guard
+    if (_firedGradingIds.has(gradeRequest.quiz_id)) return;
+    _firedGradingIds.add(gradeRequest.quiz_id);
+
+    // Clear React Router's state so back-navigation won't replay this
+    navigate(location.pathname, { replace: true, state: null });
+
+    const msg =
+      `Please grade my answers for the test "${gradeRequest.quiz_title}":\n\n` +
+      gradeRequest.test_submission
+        .map((s: any, i: number) =>
+          `Q${i + 1}. ${s.question}\nMy Answer: ${s.answer || '(no answer provided)'}`
+        )
+        .join('\n\n');
+
+    sendMessage({
+      message: msg,
+      grade_test: true,
+      quiz_id: gradeRequest.quiz_id,
+      test_submission: gradeRequest.test_submission,
+      grading_instructions: gradeRequest.grading_instructions,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSend = () => {
     if (!input.trim() || isStreaming) return;
@@ -112,14 +152,157 @@ const Chat: React.FC = () => {
                   </div>
                   
                   {/* Structured Data Visualization */}
-                  {msg.type === 'flashcards' && (
-                    <div className="mt-4 grid grid-cols-1 gap-3">
-                      <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-xl">
-                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">New Flashcards Generated</span>
-                        <div className="mt-2 text-sm text-gray-600 dark:text-slate-300">
-                          Click to view {msg.data.length} new cards.
+                  {msg.type && (
+                    <div className="mt-4 grid grid-cols-1 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                      {msg.type === 'flashcards' && (
+                        <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-xl flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+                              <FiLayers className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Flashcards Ready</span>
+                              <div className="text-sm text-gray-600 dark:text-slate-300">
+                                {msg.data.length} new cards generated.
+                              </div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => navigate(msg.record_id ? `/flashcards?set_id=${msg.record_id}` : '/flashcards')}
+                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-lg hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 transition-all shadow-sm"
+                          >
+                            View Cards
+                          </button>
                         </div>
-                      </div>
+                      )}
+
+                      {(msg.type === 'mock_test' || msg.type === 'mcq_test') && (
+                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 rounded-xl flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
+                              <FiFileText className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                                {msg.type === 'mock_test' ? 'Mock Test Ready' : 'MCQ Quiz Ready'}
+                              </span>
+                              <div className="text-sm text-gray-600 dark:text-slate-300">
+                                {msg.data.length || 0} questions generated.
+                              </div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => navigate(msg.record_id ? `/mock-tests?quiz_id=${msg.record_id}` : '/mock-tests')}
+                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-lg hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 transition-all shadow-sm"
+                          >
+                            Start Test
+                          </button>
+                        </div>
+                      )}
+
+                      {msg.type === 'mock_test_grades' && msg.data && (
+                        <div className="mt-3 space-y-3">
+                          {/* Score header */}
+                          <div className="p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-xl">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${
+                                  msg.data.total_marks / msg.data.max_total_marks >= 0.7
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                                    : 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400'
+                                }`}>
+                                  {msg.data.max_total_marks > 0
+                                    ? Math.round((msg.data.total_marks / msg.data.max_total_marks) * 100)
+                                    : 0}%
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Grading Complete</span>
+                                  <div className="text-sm font-semibold text-gray-800 dark:text-white mt-0.5">
+                                    {msg.data.total_marks} / {msg.data.max_total_marks} marks
+                                  </div>
+                                </div>
+                              </div>
+                              <FiCheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                            </div>
+                            {msg.data.overall_feedback && (
+                              <p className="mt-3 text-xs text-gray-600 dark:text-slate-300 leading-relaxed border-t border-blue-100 dark:border-blue-800 pt-3">
+                                {msg.data.overall_feedback}
+                              </p>
+                            )}
+                          </div>
+                          {/* Per-question breakdown */}
+                          {msg.data.grades && msg.data.grades.length > 0 && (
+                            <div className="space-y-2">
+                              {msg.data.grades.map((g: any, gi: number) => {
+                                const pct = g.max_marks > 0 ? g.marks / g.max_marks : 0;
+                                const isGood = pct >= 0.7;
+                                return (
+                                  <div
+                                    key={gi}
+                                    className={`p-3 rounded-xl border text-xs ${
+                                      isGood
+                                        ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20'
+                                        : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                      <p className="font-semibold text-gray-800 dark:text-white">
+                                        Q{gi + 1}. {g.question}
+                                      </p>
+                                      <span className={`font-bold flex-shrink-0 ${
+                                        isGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                                      }`}>
+                                        {g.marks}/{g.max_marks}
+                                      </span>
+                                    </div>
+                                    {g.student_answer && (
+                                      <p className="text-gray-500 dark:text-slate-400 mb-1">
+                                        <span className="font-medium">Your answer:</span> {g.student_answer}
+                                      </p>
+                                    )}
+                                    {g.correct_answer && (
+                                      <p className="text-emerald-700 dark:text-emerald-400 mb-1">
+                                        <span className="font-medium">Correct answer:</span> {g.correct_answer}
+                                      </p>
+                                    )}
+                                    {g.feedback && (
+                                      <p className="text-gray-600 dark:text-slate-300 italic">{g.feedback}</p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {msg.type === 'document' && (
+                        <div className="p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-800 rounded-xl flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-amber-600 flex items-center justify-center text-white">
+                              <FiDownload className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">PDF Export Ready</span>
+                              <div className="text-sm text-gray-600 dark:text-slate-300 truncate max-w-[150px]">
+                                {msg.data.filename || 'exported_document.pdf'}
+                              </div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              const linkSource = `data:${msg.data.mime_type};base64,${msg.data.file_base64}`;
+                              const downloadLink = document.createElement("a");
+                              downloadLink.href = linkSource;
+                              downloadLink.download = msg.data.filename;
+                              downloadLink.click();
+                            }}
+                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-lg hover:bg-amber-600 hover:text-white dark:hover:bg-amber-600 transition-all shadow-sm"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

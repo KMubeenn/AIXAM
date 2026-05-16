@@ -78,10 +78,13 @@ export const ChatService = {
       buffer = lines.pop() || '';
 
       for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
         // Try to detect if the line is a JSON object for structured data
-        if (line.trim().startsWith('{') && line.trim().endsWith('}')) {
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
           try {
-            const parsed = JSON.parse(line);
+            const parsed = JSON.parse(trimmed);
             onStructuredData(parsed);
             continue;
           } catch (e) {
