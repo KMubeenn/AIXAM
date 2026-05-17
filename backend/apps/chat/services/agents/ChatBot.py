@@ -84,7 +84,18 @@ class Agent():
             if (meta_data.get("langgraph_node")=="llm_call"
                 and isinstance(message,AIMessageChunk)
                 and message.content):
-                yield {"type":"token","content":message.content}
+                content = message.content
+                if isinstance(content, list):
+                    text_parts = []
+                    for part in content:
+                        if isinstance(part, dict) and "text" in part:
+                            text_parts.append(part["text"])
+                        elif isinstance(part, str):
+                            text_parts.append(part)
+                    content = "".join(text_parts)
+                
+                if content:
+                    yield {"type":"token","content":content}
 
         final_state=(await self.agent_graph.aget_state(config)).values
 

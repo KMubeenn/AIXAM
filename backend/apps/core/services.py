@@ -217,48 +217,47 @@ class CoreService:
         return deleted > 0
 
     # ──────────────────────────────────────────────
-    # SUBMISSIONS & GRADING
-    # ──────────────────────────────────────────────
-
     @staticmethod
     @sync_to_async
-    def save_submission(student_id,quiz_id,score,feedback=''):
+    def save_submission(student_id, quiz_id, score, feedback, grading_details=None):
         return Submission.objects.create(
             student_id=student_id,
             quiz_id=quiz_id,
             score=score,
-            feedback=feedback
+            feedback=feedback,
+            grading_details=grading_details
         )
 
     @staticmethod
     @sync_to_async
     def get_user_submissions(user_id):
-        submissions=list(
+        submissions = list(
             Submission.objects.filter(student_id=user_id)
             .select_related('quiz')
+            .prefetch_related('quiz__questions')
         )
         return [{
-            'id':str(s.id),
-            'quiz_title':s.quiz.title if s.quiz else 'N/A',
-            'quiz_id':str(s.quiz.id) if s.quiz else None,
-            'score':s.score,
-            'feedback':s.feedback,
-            'is_late':s.is_late,
-            'submitted_at':s.submitted_at.isoformat()
+            'id': str(s.id),
+            'quiz_title': s.quiz.title if s.quiz else 'N/A',
+            'quiz_id': str(s.quiz.id) if s.quiz else None,
+            'question_count': s.quiz.questions.count() if s.quiz else 0,
+            'score': s.score,
+            'submitted_at': s.submitted_at.isoformat(),
         } for s in submissions]
 
     @staticmethod
     @sync_to_async
     def get_submission(submission_id):
-        s=Submission.objects.select_related('quiz').get(id=submission_id)
+        s = Submission.objects.select_related('quiz').get(id=submission_id)
         return {
-            'id':str(s.id),
-            'quiz_title':s.quiz.title if s.quiz else 'N/A',
-            'quiz_id':str(s.quiz.id) if s.quiz else None,
-            'score':s.score,
-            'feedback':s.feedback,
-            'is_late':s.is_late,
-            'submitted_at':s.submitted_at.isoformat()
+            'id': str(s.id),
+            'quiz_title': s.quiz.title if s.quiz else 'N/A',
+            'quiz_id': str(s.quiz.id) if s.quiz else None,
+            'score': s.score,
+            'feedback': s.feedback,
+            'is_late': s.is_late,
+            'submitted_at': s.submitted_at.isoformat(),
+            'grading_details': s.grading_details or [],
         }
 
     # ──────────────────────────────────────────────

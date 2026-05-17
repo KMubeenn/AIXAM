@@ -78,6 +78,7 @@ class Message(models.Model):
     )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
     content = models.TextField()
+    metadata = models.JSONField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     sequence_number = models.PositiveIntegerField()
     

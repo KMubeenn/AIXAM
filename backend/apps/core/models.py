@@ -266,6 +266,7 @@ class Submission(models.Model):
     score = models.FloatField(null=True, blank=True)
     feedback = models.TextField(blank=True)
     is_late = models.BooleanField(default=False)
+    grading_details = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = 'submissions'

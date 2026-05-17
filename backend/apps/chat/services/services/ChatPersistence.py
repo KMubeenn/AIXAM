@@ -59,7 +59,13 @@ class ChatPersistenceService:
     def serialize_session_messages(messages:list[Message]):
         serialized_messages=[]
         for msg in messages:
-            serialized_messages.append({'id':msg.id,'role':msg.role,'content':msg.content,'sequence_number':msg.sequence_number})
+            serialized_messages.append({
+                'id': str(msg.id),
+                'role': msg.role,
+                'content': msg.content,
+                'sequence_number': msg.sequence_number,
+                'metadata': msg.metadata,
+            })
         return serialized_messages
 
 
@@ -71,8 +77,13 @@ class ChatPersistenceService:
         return serialized_messages
 
     @staticmethod
-    async def update_messages(session_id,role,content):
-        await sync_to_async(Message.objects.create)(session_id=session_id,role=role,content=content)
+    async def update_messages(session_id, role, content, metadata=None):
+        await sync_to_async(Message.objects.create)(
+            session_id=session_id,
+            role=role,
+            content=content,
+            metadata=metadata
+        )
 
     @classmethod
     async def update_session_memory(cls,session_id,human_message,ai_message):

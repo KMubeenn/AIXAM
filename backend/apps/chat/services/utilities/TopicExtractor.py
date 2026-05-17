@@ -1,10 +1,15 @@
-from langchain.chat_models import init_chat_model
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.messages import SystemMessage, HumanMessage
 
 class TopicExtractor:
     def __init__(self):
         # We use a fast, low-temperature model for extraction
-        self.llm = init_chat_model("groq:llama-3.1-8b-instant", temperature=0.1)
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=0.1
+        )
         self.prompt = SystemMessage(content=(
             "You are a topic extraction utility. "
             "Given a user's prompt or text, extract the core academic or structural topic in 1 to 4 words. "

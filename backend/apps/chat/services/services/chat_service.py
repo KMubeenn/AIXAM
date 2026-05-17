@@ -18,45 +18,70 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
     query=message[-1].content
     await chat_persistence.update_messages(session_id=session_id,role="user",content=query)
     full_response=[]
-    if await chat_persistence.get_title(session_id=session_id)=='New Chat':
-        from apps.chat.services.utilities.TopicExtractor import TopicExtractor
-        extractor = TopicExtractor()
-        topic = await extractor.extract_topic(query)
-        await chat_persistence.set_title(session_id=session_id,message=topic)
+    structured_outputs = []
+    try:
+        if await chat_persistence.get_title(session_id=session_id)=='New Chat':
+            from apps.chat.services.utilities.TopicExtractor import TopicExtractor
+            extractor = TopicExtractor()
+            topic = await extractor.extract_topic(query)
+            await chat_persistence.set_title(session_id=session_id,message=topic)
 
-    async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions,user_id=user_id):
-        if output["type"]=="token":
-            full_response.append(output["content"])
-            yield output["content"]
-        else:
-            if user_id:
-                record_id=await _persist_structured_output(user_id,output,session_id,study_material_id,quiz_id)
-                if record_id:
-                    output['record_id']=record_id
-            yield f"\n{json.dumps(output)}\n"
+        async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions,user_id=user_id):
+            if output["type"]=="token":
+                full_response.append(output["content"])
+                yield output["content"]
+            else:
+                if user_id:
+                    record_id, metadata = await _persist_structured_output(user_id,output,session_id,study_material_id,quiz_id)
+                    if record_id:
+                        output['record_id']=record_id
+                    if metadata:
+                        structured_outputs.append(metadata)
+                yield f"\n{json.dumps(output)}\n"
 
-    response=''.join(full_response)
-    if response:
-        await chat_persistence.update_messages(session_id=session_id,role='assistant',content=response)
-        await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=response)
+        response=''.join(full_response)
+        pending_metadata = None
+        if len(structured_outputs) == 1:
+            pending_metadata = structured_outputs[0]
+        elif len(structured_outputs) > 1:
+            pending_metadata = {
+                'type': 'multi_assets',
+                'items': structured_outputs
+            }
+
+        if response:
+            await chat_persistence.update_messages(session_id=session_id, role='assistant', content=response, metadata=pending_metadata)
+            await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=response)
+    except Exception as e:
+        error_msg = "Sorry, I encountered an error. Please try again."
+        await chat_persistence.update_messages(session_id=session_id, role='assistant', content=error_msg)
+        await chat_persistence.update_session_memory(session_id=session_id, human_message=query, ai_message=error_msg)
+        raise e
 
 
-async def _persist_structured_output(user_id,output,session_id,study_material_id=None,quiz_id=None):
-    """Persist structured output to DB. Returns the DB record ID if created."""
-    output_type=output.get('type')
-    data=output.get('data')
+async def _persist_structured_output(user_id, output, session_id, study_material_id=None, quiz_id=None):
+    """Persist structured output to DB. Returns (record_id, metadata) tuple."""
+    output_type = output.get('type')
+    data = output.get('data')
     if not data:
-        return None
+        return None, None
 
     # Determine topic from chat session
     chat_persistence = ChatPersistenceService()
     session_title = await chat_persistence.get_title(session_id)
     topic = session_title if session_title and session_title != "New Chat" else "General"
 
+    METADATA_TYPE_MAP = {
+        'flashcards': 'flashcards',
+        'mock_test': 'mock_test',
+        'mcq_test': 'mcq_test',
+    }
+
     try:
-        if output_type=='flashcards':
+        record_id = None
+        if output_type == 'flashcards':
             source_type = 'file' if study_material_id else 'topic'
-            return await CoreService.save_flashcard_set(
+            record_id = await CoreService.save_flashcard_set(
                 user_id=user_id,
                 cards=data,
                 title=f"{topic} Flashcards",
@@ -64,42 +89,65 @@ async def _persist_structured_output(user_id,output,session_id,study_material_id
                 topic=topic,
                 study_material_id=study_material_id
             )
-        elif output_type=='mock_test':
-            return await CoreService.save_mock_test(
+        elif output_type == 'mock_test':
+            record_id = await CoreService.save_mock_test(
                 user_id=user_id,
                 questions=data,
                 title=f"{topic} Mock Test",
                 study_material_id=study_material_id
             )
-        elif output_type=='mcq_test':
-            return await CoreService.save_mcq_test(
+        elif output_type == 'mcq_test':
+            record_id = await CoreService.save_mcq_test(
                 user_id=user_id,
                 questions=data,
                 title=f"{topic} MCQ Test",
                 study_material_id=study_material_id
             )
-        elif output_type=='mock_test_grades':
-            total_marks=data.get('total_marks',0)
-            max_total_marks=data.get('max_total_marks',0)
-            overall_feedback=data.get('overall_feedback','')
-            score_pct=(total_marks/max_total_marks*100) if max_total_marks>0 else 0
+        elif output_type == 'mock_test_grades':
+            total_marks = data.get('total_marks', 0)
+            max_total_marks = data.get('max_total_marks', 0)
+            overall_feedback = data.get('overall_feedback', '')
+            score_pct = (total_marks / max_total_marks * 100) if max_total_marks > 0 else 0
+            grading_details = data.get('grades', [])
 
-            submission=await CoreService.save_submission(
+            submission = await CoreService.save_submission(
                 student_id=user_id,
                 quiz_id=quiz_id,
                 score=score_pct,
-                feedback=overall_feedback
+                feedback=overall_feedback,
+                grading_details=grading_details
             )
             await CoreService.update_student_performance(
                 student_id=user_id,
                 topic=topic,
                 score=score_pct
             )
-            return str(submission.id)
-        elif output_type=='document' or output_type=='slide_outline':
-            return None
-        elif output_type=='assignment':
-            return await CoreService.save_assignment(
+            metadata = {
+                'type': 'mock_test_grades',
+                'record_id': str(submission.id),
+                'text_summary': f"Graded: {total_marks}/{max_total_marks} marks ({round(score_pct)}%)",
+            }
+            return str(submission.id), metadata
+        elif output_type == 'document':
+            filename = data.get('filename', 'document.pdf')
+            ext = filename.split('.')[-1].upper() if '.' in filename else 'PDF'
+            metadata = {
+                'type': 'document',
+                'record_id': '',
+                'text_summary': f"{ext} Export Ready: {filename}",
+                'document_data': {
+                    'filename': filename,
+                    'mime_type': data.get('mime_type'),
+                    'file_base64': data.get('file_base64'),
+                    'title': data.get('title'),
+                    'content': data.get('content')
+                }
+            }
+            return None, metadata
+        elif output_type == 'slide_outline':
+            return None, None
+        elif output_type == 'assignment':
+            record_id = await CoreService.save_assignment(
                 user_id=user_id,
                 title=data.get('title', f"{topic} Assignment"),
                 description=f"Generated assignment for {topic}",
@@ -107,22 +155,39 @@ async def _persist_structured_output(user_id,output,session_id,study_material_id
                 total_marks=data.get('total_marks', 100),
                 study_material_id=study_material_id
             )
-        elif output_type=='teacher_quiz':
-            return await CoreService.save_teacher_quiz(
+        elif output_type == 'teacher_quiz':
+            record_id = await CoreService.save_teacher_quiz(
                 user_id=user_id,
                 title=f"{topic} Teacher Quiz",
                 questions=data,
                 study_material_id=study_material_id
             )
-        elif output_type=='batch_grades':
-            return await CoreService.save_batch_grades(
+        elif output_type == 'batch_grades':
+            record_id = await CoreService.save_batch_grades(
                 teacher_id=user_id,
                 assignment_id=quiz_id,
                 grades_data=data
             )
+
+        # Build metadata for types that should persist in chat history
+        metadata = None
+        if record_id and output_type in METADATA_TYPE_MAP:
+            label_map = {
+                'flashcards': f"{len(data) if isinstance(data, list) else ''} flashcards generated.",
+                'mock_test': f"{len(data) if isinstance(data, list) else ''} question mock test created.",
+                'mcq_test': f"{len(data) if isinstance(data, list) else ''} question MCQ quiz created.",
+            }
+            metadata = {
+                'type': METADATA_TYPE_MAP[output_type],
+                'record_id': str(record_id),
+                'text_summary': label_map.get(output_type, 'Study material generated.'),
+            }
+
+        return record_id, metadata
+
     except Exception as e:
         print(f"[CorePersistence] Failed to save {output_type}: {e}")
-        return None
+        return None, None
 
 
 

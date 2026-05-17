@@ -2,6 +2,8 @@ import json
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableConfig
+from typing import List, Optional
+from pydantic import BaseModel, Field
 
 VALID_TEACHER_TASKS = [
     "assignment",
@@ -12,10 +14,15 @@ VALID_TEACHER_TASKS = [
     "generate_pptx"
 ]
 
+class TeacherTaskStep(BaseModel):
+    step: int = Field(..., description="Sequential step number starting from 1")
+    task: str = Field(..., description='One of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx"')
+    depends_on: Optional[int] = Field(default=None, description="Step number that this task depends on, or null/None if independent")
+
 class TeacherTools():
     @staticmethod
     @tool
-    def plan_tasks(steps: list[dict]):
+    def plan_tasks(steps: List[TeacherTaskStep]):
         """CRITICAL: ONLY use this tool if the teacher explicitly asks to generate an assignment, a quiz, or slides. If the teacher asks a normal question, is greeting you, or having a general conversation, DO NOT use this tool and reply directly to them.
 
         Plan the tasks needed to fulfill the teacher's request.
@@ -35,7 +42,9 @@ class TeacherTools():
         - "Quiz on ML and export as PDF" -> [{"step": 1, "task": "teacher_quiz", "depends_on": null}, {"step": 2, "task": "generate_pdf", "depends_on": 1}]
         - "Create slides on neural networks as PPTX" -> [{"step": 1, "task": "slide_outline", "depends_on": null}, {"step": 2, "task": "generate_pptx", "depends_on": 1}]
         """
-        return json.dumps(steps)
+        serialized_steps = [step.dict() for step in steps]
+        return json.dumps(serialized_steps)
+
 
     @staticmethod
     def return_tools():

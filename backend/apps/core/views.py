@@ -116,13 +116,15 @@ async def get_submissions(request):
             quiz_id = body.get('quiz_id')
             score = body.get('score', 0)
             feedback = body.get('feedback', '')
+            grading_details = body.get('grading_details', None)
             if not quiz_id:
                 return JsonResponse({'error': 'quiz_id is required'}, status=400)
             submission = await CoreService.save_submission(
                 student_id=user.id,
                 quiz_id=quiz_id,
                 score=score,
-                feedback=feedback
+                feedback=feedback,
+                grading_details=grading_details
             )
             return JsonResponse({'id': str(submission.id), 'message': 'Submission saved'}, status=201)
 

@@ -1,4 +1,6 @@
 import json
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.messages import SystemMessage
 from apps.chat.services.agents.agent_state import BaseState,Document
 from typing import TypedDict
@@ -66,7 +68,11 @@ class StudentAgent():
 
     def __init__(self,temperature:float = 0.7):
         self.temperature=temperature
-        base_llm=init_chat_model("groq:llama-3.3-70b-versatile",temperature=self.temperature)
+        base_llm=ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=self.temperature
+        )
         self.llm=base_llm.bind_tools(StudentTools.return_tools())
         self.flashcard_llm=base_llm.with_structured_output(FlashCardSet)
         self.mock_test_llm=base_llm.with_structured_output(MockTestSet)

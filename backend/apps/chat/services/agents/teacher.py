@@ -1,6 +1,8 @@
 import json
+import os
 from pathlib import Path
 from typing import TypedDict, Literal
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from langchain.messages import SystemMessage, HumanMessage
 from langchain.chat_models import init_chat_model
@@ -77,7 +79,11 @@ class TeacherAgent:
 
     def __init__(self, temperature: float = 0.7):
         self.temperature = temperature
-        base_llm = init_chat_model("groq:llama-3.3-70b-versatile", temperature=self.temperature)
+        base_llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=self.temperature
+        )
         self.llm = base_llm.bind_tools(TeacherTools.return_tools())
         
         self.assignment_llm = base_llm.with_structured_output(GeneratedAssignment)
