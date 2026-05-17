@@ -53,6 +53,15 @@ export const useChat = () => {
             setMessages((prev) => {
               const lastIndex = prev.length - 1;
               if (lastIndex >= 0 && prev[lastIndex].role === "assistant") {
+                const currentMsg = prev[lastIndex];
+                const newOutput = {
+                  type: structuredData.type,
+                  data: structuredData.data,
+                  record_id: structuredData.record_id,
+                };
+                const existingOutputs = currentMsg.outputs || [];
+                const nextOutputs = [...existingOutputs, newOutput];
+
                 return [
                   ...prev.slice(0, lastIndex),
                   {
@@ -60,6 +69,7 @@ export const useChat = () => {
                     type: structuredData.type,
                     data: structuredData.data,
                     record_id: structuredData.record_id,
+                    outputs: nextOutputs,
                   },
                 ];
               }
@@ -76,15 +86,28 @@ export const useChat = () => {
         );
       } catch (error) {
         console.error("Chat error:", error);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: "Sorry, I encountered an error. Please try again.",
-          },
-        ]);
+        setMessages((prev) => {
+          const lastIndex = prev.length - 1;
+          if (lastIndex >= 0 && prev[lastIndex].role === "assistant" && prev[lastIndex].content === "") {
+            return [
+              ...prev.slice(0, lastIndex),
+              {
+                role: "assistant",
+                content: "Sorry, I encountered an error. Please try again.",
+              },
+            ];
+          }
+          return [
+            ...prev,
+            {
+              role: "assistant",
+              content: "Sorry, I encountered an error. Please try again.",
+            },
+          ];
+        });
       } finally {
         setIsStreaming(false);
+        queryClient.invalidateQueries({ queryKey: ["chat-sessions"] });
       }
     },
     [sessionId],
@@ -125,14 +148,14 @@ export const useSessions = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ChatService.deleteSession(id),
-    onMutate: async (id) => {
+    onMutate: async (id: string) => {
       // Small delay before "hiding" it optimistically
       const timeoutId = setTimeout(() => {
         setHiddenIds(prev => new Set(prev).add(id));
       }, 500);
       return { timeoutId };
     },
-    onError: (err, id, context) => {
+    onError: (err: any, id: string, context: any) => {
       if (context?.timeoutId) clearTimeout(context.timeoutId);
       setHiddenIds(prev => {
         const next = new Set(prev);
@@ -145,7 +168,7 @@ export const useSessions = () => {
       queryClient.invalidateQueries({ queryKey: ["chat-sessions"] });
       toast.success("Chat deleted successfully");
     },
-    onSettled: (data, error, id, context) => {
+    onSettled: (data: any, error: any, id: string, context: any) => {
       if (context?.timeoutId) clearTimeout(context.timeoutId);
       // Clean up the hidden ID once the real data refresh is likely done
       setTimeout(() => {
@@ -159,7 +182,7 @@ export const useSessions = () => {
   });
 
   const sessions = sessionsQuery.data?.user_sessions || [];
-  const visibleSessions = sessions.filter(s => !hiddenIds.has(s.id));
+  const visibleSessions = sessions.filter((s: any) => !hiddenIds.has(s.id));
 
   return {
     sessions: visibleSessions,

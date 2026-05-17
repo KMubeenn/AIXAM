@@ -22,9 +22,18 @@ import { useSessions } from "../../../hooks/useChat";
 interface SidebarProps {
   onSessionSelect?: (sessionId: string) => void;
   onNewChat?: () => void;
+  onSessionDelete?: (sessionId: string) => void;
+  activeSessionId?: string | null;
+  loadingSessionId?: string | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  onSessionSelect,
+  onNewChat,
+  onSessionDelete,
+  activeSessionId,
+  loadingSessionId
+}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
@@ -110,28 +119,51 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
               ) : sessions.length === 0 ? (
                 <p className="px-4 py-2 text-xs text-gray-400 dark:text-slate-600 italic">No recent chats</p>
               ) : (
-                sessions.map((session: any) => (
-                  <div key={session.id} className="group relative">
-                    <button
-                       onClick={() => onSessionSelect?.(session.id)}
-                       disabled={isDeleting && deletingId === session.id}
-                       className={`w-full flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors text-left truncate pr-8 ${
-                         isDeleting && deletingId === session.id 
-                           ? "bg-red-50 dark:bg-red-900/20 text-red-600 animate-pulse" 
-                           : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800"
-                       }`}
-                     >
-                       <LuHistory className={`w-3.5 h-3.5 flex-shrink-0 ${isDeleting && deletingId === session.id ? "animate-spin" : ""}`} />
-                       <span className="truncate">{session.title || 'Untitled Chat'}</span>
-                     </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <LuTrash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))
+                sessions.map((session: any) => {
+                  const isActiveSession = activeSessionId === session.id;
+                  const isLoadingThisSession = loadingSessionId === session.id;
+
+                  return (
+                    <div key={session.id} className="group relative">
+                      <button
+                         onClick={() => onSessionSelect?.(session.id)}
+                         disabled={(isDeleting && deletingId === session.id) || isLoadingThisSession}
+                         className={`w-full flex items-center gap-2 px-4 py-2 text-xs font-medium transition-all text-left truncate pr-8 ${
+                           isDeleting && deletingId === session.id 
+                             ? "bg-red-50 dark:bg-red-900/20 text-red-600 animate-pulse rounded-lg" 
+                             : isLoadingThisSession
+                               ? "bg-indigo-50/40 dark:bg-indigo-950/20 text-indigo-500 animate-pulse rounded-lg"
+                               : isActiveSession
+                                 ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 font-bold border-l-4 border-indigo-500 pl-3 rounded-r-lg"
+                                 : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg"
+                         }`}
+                       >
+                         <LuHistory className={`w-3.5 h-3.5 flex-shrink-0 ${
+                           isDeleting && deletingId === session.id 
+                             ? "animate-spin text-red-500" 
+                             : isLoadingThisSession
+                               ? "animate-spin text-indigo-500"
+                               : isActiveSession
+                                 ? "text-indigo-600 dark:text-indigo-400"
+                                 : ""
+                         }`} />
+                         <span className={`truncate ${isLoadingThisSession ? "italic text-indigo-400 dark:text-indigo-500" : ""}`}>
+                           {isLoadingThisSession ? "Loading..." : (session.title || 'Untitled Chat')}
+                         </span>
+                       </button>
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          deleteSession(session.id); 
+                          onSessionDelete?.(session.id);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <LuTrash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

@@ -99,11 +99,21 @@ export const useSubmissions = () => {
   });
 };
 
+export const useSubmissionDetail = (id: string | null) => {
+  return useQuery({
+    queryKey: ['submission-detail', id],
+    queryFn: () => CoreService.getSubmissionDetail(id!),
+    enabled: !!id,
+  });
+};
+
 export const useSubmitQuiz = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ quizId, score, feedback }: { quizId: string; score: number; feedback: string }) =>
-      CoreService.submitQuiz(quizId, score, feedback),
+    mutationFn: ({
+      quizId, score, feedback, gradingDetails,
+    }: { quizId: string; score: number; feedback: string; gradingDetails?: any[] }) =>
+      CoreService.submitQuiz(quizId, score, feedback, gradingDetails),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
     },

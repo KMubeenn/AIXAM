@@ -40,10 +40,21 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
   const handleMcqSubmit = async () => {
     if (!quiz) return;
     let correct = 0;
+    const gradingDetails: any[] = [];
     for (const q of mcqQuestions) {
       const selectedId = mcqAnswers[q.id];
       const selectedChoice = q.choices?.find((c) => c.id === selectedId);
-      if (selectedChoice?.is_correct) correct++;
+      const correctChoice = q.choices?.find((c) => c.is_correct);
+      const isCorrect = selectedChoice?.is_correct ?? false;
+      if (isCorrect) correct++;
+      gradingDetails.push({
+        question: q.text,
+        student_answer: selectedChoice?.text ?? "(no answer)",
+        correct_answer: correctChoice?.text ?? "",
+        marks: isCorrect ? q.points : 0,
+        max_marks: q.points,
+        feedback: isCorrect ? "Correct answer!" : `The correct answer was: ${correctChoice?.text ?? "N/A"}`,
+      });
     }
     const pct = totalMcq > 0 ? Math.round((correct / totalMcq) * 100) : 0;
     setScore({ correct, total: totalMcq });
@@ -53,6 +64,7 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
         quizId: quiz.id,
         score: pct,
         feedback: `Auto-graded MCQ: ${correct}/${totalMcq} correct (${pct}%)`,
+        gradingDetails,
       });
     } catch (e) {
       console.error("Failed to save submission:", e);

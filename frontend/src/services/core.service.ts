@@ -98,9 +98,28 @@ export interface Submission {
   quiz_title: string;
   quiz_id: string | null;
   score: number | null;
+  question_count: number;
+  submitted_at: string;
+}
+
+export interface GradingItem {
+  question: string;
+  student_answer: string;
+  correct_answer?: string;
+  marks: number;
+  max_marks: number;
+  feedback: string;
+}
+
+export interface SubmissionDetail {
+  id: string;
+  quiz_title: string;
+  quiz_id: string | null;
+  score: number | null;
   feedback: string;
   is_late: boolean;
   submitted_at: string;
+  grading_details: GradingItem[];
 }
 
 // ──────────────────────────────────────────────
@@ -174,8 +193,18 @@ export const CoreService = {
     return response.data;
   },
 
-  async submitQuiz(quizId: string, score: number, feedback: string): Promise<{ id: string; message: string }> {
-    const response = await api.post('/core/submissions/', { quiz_id: quizId, score, feedback });
+  async getSubmissionDetail(id: string): Promise<SubmissionDetail> {
+    const response = await api.get(`/core/submissions/${id}/`);
+    return response.data;
+  },
+
+  async submitQuiz(quizId: string, score: number, feedback: string, gradingDetails?: any[]): Promise<{ id: string; message: string }> {
+    const response = await api.post('/core/submissions/', {
+      quiz_id: quizId,
+      score,
+      feedback,
+      ...(gradingDetails ? { grading_details: gradingDetails } : {}),
+    });
     return response.data;
   },
 };

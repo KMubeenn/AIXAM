@@ -18,6 +18,11 @@ export interface ChatMessage {
   type?: string;
   data?: any;
   record_id?: string;
+  outputs?: Array<{
+    type: string;
+    data: any;
+    record_id?: string;
+  }>;
 }
 
 export const ChatService = {
