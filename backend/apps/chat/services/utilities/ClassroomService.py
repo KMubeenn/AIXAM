@@ -95,26 +95,144 @@ class ClassroomService:
     def get_submissions(user: User, course_id: str, coursework_id: str):
         try:
             service = ClassroomService.get_service(user)
-            # 1. Fetch all student submissions
             results = service.courses().courseWork().studentSubmissions().list(
                 courseId=course_id, courseWorkId=coursework_id).execute()
             submissions = results.get('studentSubmissions', [])
-            
-            # 2. Fetch student profiles to attach names
+
             students_result = service.courses().students().list(courseId=course_id).execute()
             students = {s['userId']: s['profile']['name']['fullName'] for s in students_result.get('students', [])}
-            
+
             parsed_submissions = []
             for sub in submissions:
-                # Submissions can have attachments (Google Docs, Links, Drive Files). 
-                # This grabs the submission IDs and current grading states.
                 parsed_submissions.append({
                     "id": sub.get("id"),
                     "userId": sub.get("userId"),
                     "studentName": students.get(sub.get("userId"), "Unknown Student"),
                     "state": sub.get("state"),
                     "assignedGrade": sub.get("assignedGrade"),
+                    "hasAttachments": bool(sub.get("assignmentSubmission", {}).get("attachments")),
                 })
             return parsed_submissions
         except Exception as e:
             raise ClassroomServiceError(f"Failed to get submissions: {str(e)}")
+
+    @staticmethod
+    def fetch_submission_content(user: User, course_id: str, coursework_id: str, submission_id: str) -> str:
+        """
+        Fetch and extract readable text content from a single student submission.
+        Supports Google Docs (exported as plain text) and Drive files (PDF/DOCX exported as plain text).
+        Returns a concatenated plain-text string of all attachments.
+        Requires scopes:
+          - https://www.googleapis.com/auth/drive.readonly
+          - https://www.googleapis.com/auth/classroom.student-submissions.students.readonly
+        """
+        try:
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaIoBaseDownload
+            import io
+
+            creds = ClassroomService.get_credentials(user)
+            classroom_service = build('classroom', 'v1', credentials=creds)
+            drive_service = build('drive', 'v3', credentials=creds)
+
+            result = classroom_service.courses().courseWork().studentSubmissions().get(
+                courseId=course_id,
+                courseWorkId=coursework_id,
+                id=submission_id
+            ).execute()
+
+            attachments = result.get('assignmentSubmission', {}).get('attachments', [])
+            if not attachments:
+                return "[No attachments found in this submission]"
+
+            extracted_parts = []
+            for attachment in attachments:
+                try:
+                    if 'driveFile' in attachment:
+                        file_id = attachment['driveFile']['id']
+                        file_meta = drive_service.files().get(fileId=file_id, fields='mimeType,name').execute()
+                        mime = file_meta.get('mimeType', '')
+                        name = file_meta.get('name', 'file')
+
+                        if mime == 'application/vnd.google-apps.document':
+                            # Export Google Doc as plain text
+                            response = drive_service.files().export(
+                                fileId=file_id, mimeType='text/plain'
+                            ).execute()
+                            text = response.decode('utf-8') if isinstance(response, bytes) else str(response)
+                        else:
+                            # Download PDF/DOCX and extract text
+                            request = drive_service.files().get_media(fileId=file_id)
+                            buffer = io.BytesIO()
+                            downloader = MediaIoBaseDownload(buffer, request)
+                            done = False
+                            while not done:
+                                _, done = downloader.next_chunk()
+                            buffer.seek(0)
+
+                            if 'pdf' in mime:
+                                try:
+                                    import pdfplumber
+                                    with pdfplumber.open(buffer) as pdf:
+                                        text = '\n'.join(page.extract_text() or '' for page in pdf.pages)
+                                except Exception:
+                                    text = f"[Could not extract text from PDF: {name}]"
+                            elif 'wordprocessingml' in mime or 'docx' in mime:
+                                try:
+                                    from docx import Document
+                                    doc = Document(buffer)
+                                    text = '\n'.join(p.text for p in doc.paragraphs)
+                                except Exception:
+                                    text = f"[Could not extract text from DOCX: {name}]"
+                            else:
+                                text = f"[Unsupported file type: {mime} — {name}]"
+
+                        extracted_parts.append(f"--- Attachment: {name} ---\n{text.strip()}")
+
+                    elif 'link' in attachment:
+                        extracted_parts.append(f"[Link submission: {attachment['link'].get('url', 'unknown')}]")
+
+                except Exception as attach_err:
+                    extracted_parts.append(f"[Error reading attachment: {attach_err}]")
+
+            return "\n\n".join(extracted_parts)
+
+        except Exception as e:
+            raise ClassroomServiceError(f"Failed to fetch submission content: {str(e)}")
+
+    @staticmethod
+    def patch_grade(user: User, course_id: str, coursework_id: str, submission_id: str, assigned_grade: float, draft_grade: float = None):
+        """
+        Push a grade back to Google Classroom for a specific student submission.
+        Sets both assignedGrade (released to student) and optionally draftGrade.
+        Requires scope:
+          - https://www.googleapis.com/auth/classroom.grades
+        """
+        try:
+            service = ClassroomService.get_service(user)
+
+            body = {'assignedGrade': assigned_grade}
+            if draft_grade is not None:
+                body['draftGrade'] = draft_grade
+
+            # updateMask specifies which fields to update
+            update_mask = 'assignedGrade'
+            if draft_grade is not None:
+                update_mask += ',draftGrade'
+
+            result = service.courses().courseWork().studentSubmissions().patch(
+                courseId=course_id,
+                courseWorkId=coursework_id,
+                id=submission_id,
+                updateMask=update_mask,
+                body=body
+            ).execute()
+
+            return {
+                "submission_id": result.get("id"),
+                "assignedGrade": result.get("assignedGrade"),
+                "draftGrade": result.get("draftGrade"),
+                "state": result.get("state"),
+            }
+        except Exception as e:
+            raise ClassroomServiceError(f"Failed to patch grade: {str(e)}")

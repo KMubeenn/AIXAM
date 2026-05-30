@@ -447,3 +447,42 @@ class CoreService:
             "total_marks": a.total_marks,
             "created_at": a.created_at.isoformat()
         } for a in assignments]
+
+    @staticmethod
+    @sync_to_async
+    def get_teacher_quizzes(user_id):
+        """Returns all teacher-created quizzes (assignment_quiz type)."""
+        from apps.core.models import Quiz
+        quizzes = list(
+            Quiz.objects.filter(created_by_id=user_id, quiz_type='assignment_quiz')
+            .prefetch_related('questions')
+            .order_by('-created_at')[:50]
+        )
+        return [{
+            'id': str(q.id),
+            'title': q.title,
+            'question_count': q.questions.count(),
+            'created_at': q.created_at.isoformat(),
+        } for q in quizzes]
+
+    @staticmethod
+    @sync_to_async
+    def get_batch_grades_for_assignment(assignment_id):
+        """Returns all submissions and their grading details for a given assignment."""
+        from apps.core.models import Submission
+        submissions = list(
+            Submission.objects.filter(assignment_id=assignment_id)
+            .select_related('student')
+            .order_by('-submitted_at')
+        )
+        return [{
+            'id': str(s.id),
+            'student_id': str(s.student.id),
+            'student_name': f"{s.student.first_name} {s.student.last_name}".strip() or s.student.username,
+            'student_email': s.student.email,
+            'score': s.score,
+            'feedback': s.feedback,
+            'is_late': s.is_late,
+            'submitted_at': s.submitted_at.isoformat(),
+            'grading_details': s.grading_details or [],
+        } for s in submissions]

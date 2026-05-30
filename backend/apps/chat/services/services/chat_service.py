@@ -75,6 +75,8 @@ async def _persist_structured_output(user_id, output, session_id, study_material
         'flashcards': 'flashcards',
         'mock_test': 'mock_test',
         'mcq_test': 'mcq_test',
+        'assignment': 'assignment',
+        'teacher_quiz': 'teacher_quiz',
     }
 
     try:
@@ -176,6 +178,8 @@ async def _persist_structured_output(user_id, output, session_id, study_material
                 'flashcards': f"{len(data) if isinstance(data, list) else ''} flashcards generated.",
                 'mock_test': f"{len(data) if isinstance(data, list) else ''} question mock test created.",
                 'mcq_test': f"{len(data) if isinstance(data, list) else ''} question MCQ quiz created.",
+                'assignment': f"Assignment '{data.get('title', '')}' generated and saved.",
+                'teacher_quiz': f"Teacher quiz with {len(data) if isinstance(data, list) else ''} questions saved.",
             }
             metadata = {
                 'type': METADATA_TYPE_MAP[output_type],

@@ -324,3 +324,188 @@ async def get_assignment_submissions(request, assignment_id):
         return JsonResponse({'submissions': data})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# ──────────────────────────────────────────────
+# TEACHER QUIZZES
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_teacher_quizzes(request):
+    """List all quizzes (assignment_quiz type) created by the teacher."""
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        quizzes = await CoreService.get_teacher_quizzes(user.id)
+        return JsonResponse({'quizzes': quizzes})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ──────────────────────────────────────────────
+# GOOGLE CLASSROOM INTEGRATION
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def list_google_courses_view(request):
+    """List all Google Classroom courses managed by the authenticated teacher."""
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        from apps.chat.services.utilities.ClassroomService import ClassroomService, ClassroomServiceError
+        courses = await sync_to_async(ClassroomService.list_courses)(user)
+        return JsonResponse({'courses': courses})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def list_google_submissions_view(request, course_id, coursework_id):
+    """
+    List all student submissions (metadata only) for a given Google Classroom assignment.
+    Each submission includes hasAttachments flag so the frontend knows whether content can be fetched.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        from apps.chat.services.utilities.ClassroomService import ClassroomService, ClassroomServiceError
+        submissions = await sync_to_async(ClassroomService.get_submissions)(user, course_id, coursework_id)
+        return JsonResponse({'submissions': submissions})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def fetch_submission_content_view(request, course_id, coursework_id, submission_id):
+    """
+    Extract and return the plain-text content of a single student's submission attachments.
+    Supports Google Docs, PDFs, and DOCX files stored in Google Drive.
+    Used to feed submission text into the AI batch grading flow.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        from apps.chat.services.utilities.ClassroomService import ClassroomService, ClassroomServiceError
+        content = await sync_to_async(ClassroomService.fetch_submission_content)(
+            user, course_id, coursework_id, submission_id
+        )
+        return JsonResponse({'submission_id': submission_id, 'content': content})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def patch_grade_view(request, course_id, coursework_id, submission_id):
+    """
+    Push a grade back to Google Classroom for a specific student submission.
+    Body: { "assigned_grade": float, "draft_grade": float (optional) }
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        body = json.loads(request.body)
+        assigned_grade = body.get('assigned_grade')
+        draft_grade = body.get('draft_grade', None)
+        if assigned_grade is None:
+            return JsonResponse({'error': 'assigned_grade is required'}, status=400)
+        from apps.chat.services.utilities.ClassroomService import ClassroomService, ClassroomServiceError
+        result = await sync_to_async(ClassroomService.patch_grade)(
+            user, course_id, coursework_id, submission_id,
+            float(assigned_grade),
+            float(draft_grade) if draft_grade is not None else None
+        )
+        return JsonResponse({'message': 'Grade synced to Google Classroom', 'result': result})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ──────────────────────────────────────────────
+# BATCH GRADES & CLASS REPORT
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_batch_grades_view(request, assignment_id):
+    """
+    Return all student submissions and their AI-graded details for a specific assignment.
+    Used for reviewing past batch grading results.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        grades = await CoreService.get_batch_grades_for_assignment(assignment_id)
+        return JsonResponse({'grades': grades})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def generate_class_report_view(request, assignment_id):
+    """
+    Generate a downloadable PDF class performance report for a given assignment.
+    Accepts optional pre-computed grades_data in the body; otherwise fetches from DB.
+    Body (optional): {
+        "grades_data": { ... BatchGradingResult ... }
+    }
+    Returns: { "filename": str, "mime_type": "application/pdf", "file_base64": str }
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        body = json.loads(request.body) if request.body else {}
+        grades_data = body.get('grades_data')
+
+        if not grades_data:
+            # Build grades_data from DB submissions
+            submissions = await CoreService.get_batch_grades_for_assignment(assignment_id)
+            if not submissions:
+                return JsonResponse({'error': 'No grading data found for this assignment'}, status=404)
+
+            grades = []
+            total_score = 0
+            for s in submissions:
+                score = s.get('score') or 0
+                total_score += score
+                grades.append({
+                    'student_name': s['student_name'],
+                    'marks': score,
+                    'max_marks': 100,
+                    'feedback': s.get('feedback', ''),
+                })
+            class_avg = total_score / len(submissions) if submissions else 0
+            grades_data = {
+                'grades': grades,
+                'total_marks': total_score,
+                'max_total_marks': 100 * len(submissions),
+                'overall_feedback': '',
+                'class_average': class_avg,
+            }
+
+        # Get assignment title for the report
+        from apps.core.models import Assignment
+        try:
+            assignment = await sync_to_async(Assignment.objects.get)(id=assignment_id)
+            assignment_title = assignment.title
+        except Assignment.DoesNotExist:
+            assignment_title = 'Assignment'
+
+        from apps.chat.services.utilities.ReportGenerator import generate_class_report_pdf
+        report = await sync_to_async(generate_class_report_pdf)(assignment_title, grades_data)
+        return JsonResponse(report)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
