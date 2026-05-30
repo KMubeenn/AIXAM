@@ -293,6 +293,18 @@ class CoreService:
             'last_updated':p.last_updated.isoformat()
         } for p in perfs]
 
+    @staticmethod
+    @sync_to_async
+    def delete_submission(submission_id, student_id):
+        deleted, _ = Submission.objects.filter(id=submission_id, student_id=student_id).delete()
+        return deleted > 0
+
+    @staticmethod
+    @sync_to_async
+    def delete_study_material(material_id, user_id):
+        deleted, _ = StudyMaterial.objects.filter(id=material_id, uploaded_by_id=user_id).delete()
+        return deleted > 0
+
     # ──────────────────────────────────────────────
     # TEACHER AGENT SPECIFIC SERVICES
     # ──────────────────────────────────────────────

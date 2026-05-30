@@ -72,12 +72,32 @@ export const useQuizDetail = (id: string | null) => {
   });
 };
 
+export const useDeleteQuiz = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => CoreService.deleteQuiz(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+    },
+  });
+};
+
 // ── Materials ─────────────────────────────────────────────────────────────────
 
 export const useMaterials = () => {
   return useQuery({
     queryKey: ['materials'],
     queryFn: () => CoreService.getMaterials(),
+  });
+};
+
+export const useDeleteMaterial = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => CoreService.deleteMaterial(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+    },
   });
 };
 
@@ -114,6 +134,16 @@ export const useSubmitQuiz = () => {
       quizId, score, feedback, gradingDetails,
     }: { quizId: string; score: number; feedback: string; gradingDetails?: any[] }) =>
       CoreService.submitQuiz(quizId, score, feedback, gradingDetails),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['submissions'] });
+    },
+  });
+};
+
+export const useDeleteSubmission = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => CoreService.deleteSubmission(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
     },

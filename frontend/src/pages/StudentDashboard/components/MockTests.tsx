@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { LuFlaskConical, LuSquareCheck, LuTrash2 } from "react-icons/lu";
-import { useQuizzes } from "../../../hooks/useCore";
+import { useQuizzes, useDeleteQuiz } from "../../../hooks/useCore";
 import QuizTakerModal from "./QuizTakerModal";
 import SubmissionsHistory from "./SubmissionsHistory";
 
@@ -10,6 +10,7 @@ interface MockTestsProps {
 
 const MockTests: React.FC<MockTestsProps> = ({ initialQuizId }) => {
   const { data, isLoading } = useQuizzes();
+  const deleteQuiz = useDeleteQuiz();
   const quizzes = data?.quizzes ?? [];
 
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
@@ -20,6 +21,13 @@ const MockTests: React.FC<MockTestsProps> = ({ initialQuizId }) => {
       setActiveQuizId(initialQuizId);
     }
   }, [initialQuizId]);
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (confirm("Delete this mock test? This cannot be undone.")) {
+      deleteQuiz.mutate(id);
+    }
+  };
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -108,12 +116,21 @@ const MockTests: React.FC<MockTestsProps> = ({ initialQuizId }) => {
                         {new Date(quiz.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => setActiveQuizId(quiz.id)}
-                          className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 transition-all"
-                        >
-                          Start Test
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setActiveQuizId(quiz.id)}
+                            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 transition-all"
+                          >
+                            Start Test
+                          </button>
+                          <button
+                            onClick={(e) => handleDelete(e, quiz.id)}
+                            className="p-1.5 rounded-lg text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all"
+                            title="Delete test"
+                          >
+                            <LuTrash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

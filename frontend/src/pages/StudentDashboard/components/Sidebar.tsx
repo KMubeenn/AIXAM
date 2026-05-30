@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import {
   LuLayoutDashboard,
-  LuCloudUpload,
+  LuBookOpen,
   LuLayers,
   LuFileCheck,
   LuActivity,
@@ -174,8 +174,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             to="/study-materials"
             className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-xl font-medium transition-colors"
           >
-            <LuCloudUpload className="w-5 h-5" />
-            Upload Materials
+            <LuBookOpen className="w-5 h-5" />
+            Study Materials
           </Link>
           <Link
             to="/flashcards"

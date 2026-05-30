@@ -175,9 +175,19 @@ export const CoreService = {
     return response.data;
   },
 
+  async deleteQuiz(id: string): Promise<{ message: string }> {
+    const response = await api.delete(`/core/quizzes/${id}/delete/`);
+    return response.data;
+  },
+
   // ── Materials ────────────────────────────────
   async getMaterials(): Promise<{ materials: Material[] }> {
     const response = await api.get('/core/materials/');
+    return response.data;
+  },
+
+  async deleteMaterial(id: string): Promise<{ message: string }> {
+    const response = await api.delete(`/core/materials/${id}/delete/`);
     return response.data;
   },
 
@@ -205,6 +215,11 @@ export const CoreService = {
       feedback,
       ...(gradingDetails ? { grading_details: gradingDetails } : {}),
     });
+    return response.data;
+  },
+
+  async deleteSubmission(id: string): Promise<{ message: string }> {
+    const response = await api.delete(`/core/submissions/${id}/delete/`);
     return response.data;
   },
 };

@@ -147,6 +147,36 @@ async def get_submission_detail(request,submission_id):
         return JsonResponse({'error':str(e)},status=500)
 
 
+@csrf_exempt
+@require_http_methods(['DELETE'])
+async def delete_submission_view(request, submission_id):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        deleted = await CoreService.delete_submission(submission_id, user.id)
+        if deleted:
+            return JsonResponse({'message': 'Submission deleted'})
+        return JsonResponse({'error': 'Not found or not authorized'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['DELETE'])
+async def delete_material_view(request, material_id):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        deleted = await CoreService.delete_study_material(material_id, user.id)
+        if deleted:
+            return JsonResponse({'message': 'Study material deleted'})
+        return JsonResponse({'error': 'Not found or not authorized'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 # ──────────────────────────────────────────────
 # STUDENT PERFORMANCE
 # ──────────────────────────────────────────────

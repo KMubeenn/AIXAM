@@ -2,9 +2,9 @@ from django.urls import path
 from apps.core.views import (
     get_flashcard_sets,get_flashcard_set_detail,delete_flashcard_set_view,
     get_quizzes,get_quiz_detail,delete_quiz_view,
-    get_submissions,get_submission_detail,
+    get_submissions,get_submission_detail,delete_submission_view,
     get_performance,
-    get_materials, get_material_detail,
+    get_materials, get_material_detail, delete_material_view,
     get_assignments,get_assignment_detail,delete_assignment_view,get_assignment_submissions
 )
 
@@ -22,6 +22,7 @@ urlpatterns = [
     # Submissions
     path('submissions/',get_submissions,name='submissions'),
     path('submissions/<uuid:submission_id>/',get_submission_detail,name='submission_detail'),
+    path('submissions/<uuid:submission_id>/delete/',delete_submission_view,name='delete_submission'),
 
     # Performance
     path('performance/',get_performance,name='performance'),
@@ -29,6 +30,7 @@ urlpatterns = [
     # Study Materials
     path('materials/',get_materials,name='materials'),
     path('materials/<str:material_id>/',get_material_detail,name='material_detail'),
+    path('materials/<str:material_id>/delete/',delete_material_view,name='delete_material'),
 
     # Teacher Assignments
     path('assignments/',get_assignments,name='assignments'),

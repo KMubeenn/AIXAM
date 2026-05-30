@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import {
   LuCalendar, LuAward, LuFileText, LuX,
-  LuInfo, LuChevronDown, LuChevronUp, LuLayers,
+  LuInfo, LuChevronDown, LuChevronUp, LuLayers, LuTrash2,
 } from "react-icons/lu";
 import { FiCheckCircle, FiXCircle } from "react-icons/fi";
-import { useSubmissions, useSubmissionDetail } from "../../../hooks/useCore";
+import { useSubmissions, useSubmissionDetail, useDeleteSubmission } from "../../../hooks/useCore";
 import { GradingItem } from "../../../services/core.service";
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
@@ -160,8 +160,16 @@ export const SubmissionDetailModal: React.FC<{ id: string; onClose: () => void }
 
 const SubmissionsHistory: React.FC = () => {
   const { data, isLoading } = useSubmissions();
+  const deleteSubmission = useDeleteSubmission();
   const submissions = data?.submissions ?? [];
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleDeleteSubmission = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (confirm("Delete this submission record? This cannot be undone.")) {
+      deleteSubmission.mutate(id);
+    }
+  };
 
   const getScoreColor = (score: number | null) => {
     if (score === null) return "text-gray-400";
@@ -218,6 +226,7 @@ const SubmissionsHistory: React.FC = () => {
                     <th className="px-6 py-4">Questions</th>
                     <th className="px-6 py-4">Date</th>
                     <th className="px-6 py-4">Score</th>
+                    <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -257,6 +266,15 @@ const SubmissionsHistory: React.FC = () => {
                           <LuAward className="w-3.5 h-3.5" />
                           {sub.score !== null ? `${Math.round(sub.score)}%` : "Pending"}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={(e) => handleDeleteSubmission(e, sub.id)}
+                          className="p-1.5 rounded-lg text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all"
+                          title="Delete attempt"
+                        >
+                          <LuTrash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
