@@ -367,7 +367,8 @@ def google_classroom_callback(request):
         user.save(update_fields=['google_access_token', 'google_refresh_token'])
         
         # Redirect back to frontend
-        return JsonResponse({"message": "Google Classroom connected successfully!"})
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+        return redirect(f"{frontend_url}/classroom?success=true")
         
     except Exception as e:
         return JsonResponse({"error": f"OAuth exchange failed: {e}"}, status=500)

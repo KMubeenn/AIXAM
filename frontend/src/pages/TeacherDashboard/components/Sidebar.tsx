@@ -84,17 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
           <LuMessageSquare className="w-5 h-5" />
           AI Assistant
         </Link>
-        <Link
-          to="/chat"
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
-            isActive("/chat")
-              ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
-              : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100"
-          }`}
-        >
-          <LuCloudUpload className="w-5 h-5" />
-          Upload Content
-        </Link>
+
         <Link
           to="/teacher-assignments"
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
