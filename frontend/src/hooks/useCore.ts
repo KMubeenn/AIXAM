@@ -78,6 +78,7 @@ export const useDeleteQuiz = () => {
     mutationFn: (id: string) => CoreService.deleteQuiz(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-quizzes'] });
     },
   });
 };
@@ -98,6 +99,14 @@ export const useDeleteMaterial = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
     },
+  });
+};
+
+export const useMaterialDetail = (id: string | null) => {
+  return useQuery({
+    queryKey: ['material-detail', id],
+    queryFn: () => CoreService.getMaterialDetail(id!),
+    enabled: !!id,
   });
 };
 
@@ -203,6 +212,7 @@ export const useClassroomSubmissions = (courseId: string | null, courseworkId: s
     queryKey: ['classroom-submissions', courseId, courseworkId],
     queryFn: () => CoreService.getClassroomSubmissions(courseId!, courseworkId!),
     enabled: !!courseId && !!courseworkId,
+    retry: false,
   });
 };
 
@@ -227,5 +237,41 @@ export const usePushGrade = () => {
       draftGrade?: number;
     }) =>
       CoreService.pushGradeToClassroom(courseId, courseworkId, submissionId, assignedGrade, draftGrade),
+  });
+};
+
+export const useClassroomCoursework = (courseId: string | null) => {
+  return useQuery({
+    queryKey: ['classroom-coursework', courseId],
+    queryFn: () => CoreService.getClassroomCoursework(courseId!),
+    enabled: !!courseId,
+  });
+};
+
+// ── Teacher: Analytics ─────────────────────────────────────────────────────────
+
+export const useGradeLocalSubmission = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ submissionId, score, feedback }: { submissionId: string; score: number; feedback: string }) =>
+      CoreService.gradeLocalSubmission(submissionId, score, feedback),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-grades'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    },
+  });
+};
+
+export const usePostClassroomReport = () => {
+  return useMutation({
+    mutationFn: (assignmentId: string) => CoreService.postClassroomReport(assignmentId),
+  });
+};
+
+export const useTeacherAnalytics = () => {
+  return useQuery({
+    queryKey: ['teacher-analytics'],
+    queryFn: () => CoreService.getTeacherAnalytics(),
   });
 };

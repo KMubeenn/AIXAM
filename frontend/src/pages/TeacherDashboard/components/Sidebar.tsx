@@ -105,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
           }`}
         >
           <LuFileQuestion className="w-5 h-5" />
-          Quizzes & Grading
+          Quizzes
         </Link>
         <Link
           to="/classroom"
@@ -116,9 +116,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
           }`}
         >
           <LuUsers className="w-5 h-5" />
-          Classroom Integration
+          Classroom
         </Link>
-        <Link
+        {/* <Link
           to="/analytics"
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             isActive("/analytics")
@@ -128,7 +128,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
         >
           <LuActivity className="w-5 h-5" />
           Analytics
-        </Link>
+        </Link> */}
 
         {/* Recent Chats Section - Only visible on Chat Page */}
         {isActive("/chat") && (

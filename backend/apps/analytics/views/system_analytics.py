@@ -24,8 +24,8 @@ def _check_admin_auth(request):
     admin_username = os.getenv("ADMIN_USERNAME", "Hazard")
     admin_password = os.getenv("ADMIN_PASSWORD", "Hazard")
     
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-    if auth_header.startswith("Basic "):
+    auth_header = request.headers.get("Authorization", "") or request.META.get("HTTP_AUTHORIZATION", "")
+    if auth_header and auth_header.startswith("Basic "):
         try:
             decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
             username, password = decoded.split(':', 1)

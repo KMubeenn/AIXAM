@@ -47,25 +47,39 @@ async def agent_endpoint(request):
         memory=await chat_persistence.get_session_memory(session_id=session_id)
         agent.load_history(memory)
 
+        # Load any materials previously associated with this session
+        if session_id:
+            try:
+                from apps.core.models import StudyMaterial
+                session_materials = await sync_to_async(
+                    lambda: list(StudyMaterial.objects.filter(origin_session_id=session_id).only('processed_content', 'title'))
+                )()
+                for mat in session_materials:
+                    if mat.processed_content:
+                        agent.load_document_context_direct(mat.title, mat.processed_content)
+            except Exception as e:
+                print(f"[Chat] Failed to load session study materials: {e}")
+
         from apps.core.services import CoreService
 
         files=request.FILES.getlist("files")
         study_material_id = data.get('study_material_id', None)
         
         if files:
-            uploaded_file=files[0]
-            print(f"[FileUpload] File received: '{uploaded_file.name}' | Size: {uploaded_file.size} bytes | Content-Type: {uploaded_file.content_type}")
-            agent.load_document(uploaded_file)
-            file_ext=uploaded_file.name.rsplit('.',1)[-1].lower() if '.' in uploaded_file.name else ''
-            file_type_map={'pdf':'pdf','docx':'docx','pptx':'pptx','doc':'docx','ppt':'pptx'}
-            file_type=file_type_map.get(file_ext,'pdf')
-            material=await CoreService.save_study_material(
-                user_id=user_id,
-                title=uploaded_file.name,
-                file_type=file_type,
-                processed_content=agent.document_context or ''
-            )
-            study_material_id=str(material.id)
+            for uploaded_file in files:
+                print(f"[FileUpload] File received: '{uploaded_file.name}' | Size: {uploaded_file.size} bytes | Content-Type: {uploaded_file.content_type}")
+                extracted_content = agent.load_document(uploaded_file)
+                file_ext=uploaded_file.name.rsplit('.',1)[-1].lower() if '.' in uploaded_file.name else ''
+                file_type_map={'pdf':'pdf','docx':'docx','pptx':'pptx','doc':'docx','ppt':'pptx'}
+                file_type=file_type_map.get(file_ext,'pdf')
+                material=await CoreService.save_study_material(
+                    user_id=user_id,
+                    title=uploaded_file.name,
+                    file_type=file_type,
+                    processed_content=extracted_content or '',
+                    origin_session_id=session_id
+                )
+                study_material_id=str(material.id)
         elif study_material_id:
             # User referenced an old document
             try:

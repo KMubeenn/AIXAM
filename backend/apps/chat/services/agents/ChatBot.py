@@ -44,13 +44,26 @@ class Agent():
     def load_document(self,file):
         reader=DocumentReader()
         chunks=reader.read(file,filename=file.name)
-        self.document_context="\n\n".join(chunks)
+        content = "\n\n".join(chunks)
+        if self.document_context:
+            self.document_context += f"\n\n--- Content from: {file.name} ---\n\n" + content
+        else:
+            self.document_context = content
         print(f"[FileUpload] File read complete: {len(chunks)} chunk(s) extracted | Total chars in context: {len(self.document_context)}")
+        return content
 
     def load_text_context(self, text: str):
         """Load pre-processed text directly from the database."""
         self.document_context = text
         print(f"[ContextLoad] Loaded {len(text)} chars from existing study material.")
+
+    def load_document_context_direct(self, title: str, content: str):
+        """Append document context directly from database model."""
+        if self.document_context:
+            self.document_context += f"\n\n--- Content from: {title} ---\n\n" + content
+        else:
+            self.document_context = content
+        print(f"[ContextLoad] Loaded direct content for '{title}' ({len(content)} chars)")
 
     async def run(self,input:list,id:str,grade_test=False,test_submission=None,grading_instructions=None,user_id=None):
         system_prompt=Agent.build_prompt()
@@ -60,7 +73,7 @@ class Agent():
 
         if self.document_context:
             doc_message=HumanMessage(
-                content=f"The user has uploaded a document with the following content:\n\n{self.document_context}"
+                content=f"Here is the content of the document I uploaded for your reference:\n\n{self.document_context}"
             )
             messages=[doc_message]+messages
 
@@ -81,7 +94,8 @@ class Agent():
             stream_mode='messages'
         ):
             message,meta_data=chunk
-            if (meta_data.get("langgraph_node")=="llm_call"
+            node = meta_data.get("langgraph_node")
+            if (node=="llm_call"
                 and isinstance(message,AIMessageChunk)
                 and message.content):
                 content = message.content
@@ -95,6 +109,7 @@ class Agent():
                     content = "".join(text_parts)
                 
                 if content:
+                    print(f"[DEBUG ChatBot] Node: {node} | Yielding content: {repr(content)}")
                     yield {"type":"token","content":content}
 
         final_state=(await self.agent_graph.aget_state(config)).values

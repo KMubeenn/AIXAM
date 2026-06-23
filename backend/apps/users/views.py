@@ -287,8 +287,8 @@ def google_classroom_login(request):
     auth_token = None
     
     # Check Header first
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-    if auth_header.startswith("Bearer "):
+    auth_header = request.headers.get("Authorization", "") or request.META.get("HTTP_AUTHORIZATION", "")
+    if auth_header and auth_header.startswith("Bearer "):
         auth_token = auth_header[7:]
     
     # Fallback to GET param

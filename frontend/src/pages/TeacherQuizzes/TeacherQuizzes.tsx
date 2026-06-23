@@ -16,10 +16,10 @@ const TeacherQuizzes: React.FC = () => {
               <span className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                 <LuFileQuestion className="w-5 h-5" />
               </span>
-              Quizzes & Grading
+              Quizzes
             </h1>
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 ml-12">
-              AI-generated assignment quizzes and batch grading results.
+              AI-generated assignment quizzes.
             </p>
           </div>
 

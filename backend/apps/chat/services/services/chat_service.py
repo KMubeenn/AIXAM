@@ -28,9 +28,11 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
 
         async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions,user_id=user_id):
             if output["type"]=="token":
+                print(f"[DEBUG ChatService] Yielding token: {repr(output['content'])}")
                 full_response.append(output["content"])
                 yield output["content"]
             else:
+                print(f"[DEBUG ChatService] Yielding structured: {output['type']}")
                 if user_id:
                     record_id, metadata = await _persist_structured_output(user_id,output,session_id,study_material_id,quiz_id)
                     if record_id:
@@ -174,11 +176,12 @@ async def _persist_structured_output(user_id, output, session_id, study_material
         # Build metadata for types that should persist in chat history
         metadata = None
         if record_id and output_type in METADATA_TYPE_MAP:
+            title = data.get('title', '') if isinstance(data, dict) else ''
             label_map = {
                 'flashcards': f"{len(data) if isinstance(data, list) else ''} flashcards generated.",
                 'mock_test': f"{len(data) if isinstance(data, list) else ''} question mock test created.",
                 'mcq_test': f"{len(data) if isinstance(data, list) else ''} question MCQ quiz created.",
-                'assignment': f"Assignment '{data.get('title', '')}' generated and saved.",
+                'assignment': f"Assignment '{title}' generated and saved.",
                 'teacher_quiz': f"Teacher quiz with {len(data) if isinstance(data, list) else ''} questions saved.",
             }
             metadata = {

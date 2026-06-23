@@ -114,6 +114,7 @@ class TeacherAgent:
         return "conversation"
 
     def llm_call(self, state: TeacherState):
+        print(f"[DEBUG TeacherAgent] llm_call node entered. Messages count: {len(state.get('messages', []))}")
         messages = [state['system_prompt']]
         if state.get('files_input'):
              messages.append(SystemMessage(content=f"Available Reference Material:\n{state.get('files_input')}"))
@@ -136,6 +137,7 @@ class TeacherAgent:
 
     def should_use_tool(self, state: TeacherState):
         last_message = state['messages'][-1]
+        print(f"[DEBUG TeacherAgent] should_use_tool check. Last message: {type(last_message).__name__} | Has tool_calls: {bool(getattr(last_message, 'tool_calls', None))}")
         if last_message.tool_calls:
             return "call_tool"
         return "pass"
@@ -227,6 +229,7 @@ class TeacherAgent:
         return {"document": doc_writer.write(content, title, format_type)}
 
     def orchestrator(self, state: TeacherState):
+        print("[DEBUG TeacherAgent] orchestrator node entered.")
         llm_calls = state.get('llm_calls', 0)
 
         # Walk back through messages to find the last AIMessage with tool_calls
@@ -302,10 +305,12 @@ class TeacherAgent:
         for msg in reversed(state['messages']):
             if isinstance(msg, AIMessage) and getattr(msg, 'tool_calls', None):
                 tool_name = msg.tool_calls[0]['name']
+                print(f"[DEBUG TeacherAgent] after_tool_router. Tool name: {tool_name}")
                 if tool_name == 'plan_tasks':
                     return "orchestrator"
                 else:
                     return "llm_call"  # Let LLM read the tool result and respond
+        print("[DEBUG TeacherAgent] after_tool_router. No tool call message found in history.")
         return "orchestrator"
 
     def agent_builder(self):

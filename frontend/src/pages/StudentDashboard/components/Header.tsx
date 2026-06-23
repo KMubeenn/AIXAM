@@ -1,8 +1,26 @@
 import React from "react";
 import logoImg from "../../../assets/logo/logo-only-black.png";
-import { LuSearch, LuBell, LuMenu } from "react-icons/lu";
+import { LuBell, LuMenu } from "react-icons/lu";
+import { useLocation } from "react-router-dom";
 
 const Header: React.FC = () => {
+  const location = useLocation();
+
+  const getTitle = () => {
+    switch (location.pathname) {
+      case "/student-dashboard":
+        return "Dashboard Overview";
+      case "/study-materials":
+        return "Study Materials";
+      case "/mock-tests":
+        return "Mock Tests";
+      case "/flashcards":
+        return "Flashcards";
+      default:
+        return "Dashboard Overview";
+    }
+  };
+
   return (
     <>
       {/* Mobile Header */}
@@ -22,17 +40,9 @@ const Header: React.FC = () => {
       {/* Desktop Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 py-4 hidden lg:flex items-center justify-between sticky top-0 z-10">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Dashboard Overview
+          {getTitle()}
         </h1>
         <div className="flex items-center gap-4">
-          <div className="relative hidden sm:block">
-            <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search topics..."
-              className="pl-10 pr-4 py-2 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-64"
-            />
-          </div>
           <button className="relative p-2 text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
             <LuBell className="w-5 h-5" />
             <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>

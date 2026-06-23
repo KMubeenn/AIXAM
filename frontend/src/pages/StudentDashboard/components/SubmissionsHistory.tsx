@@ -198,7 +198,7 @@ const SubmissionsHistory: React.FC = () => {
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
               {isLoading
                 ? "Loading history..."
-                : `${submissions.length} test${submissions.length !== 1 ? "s" : ""} completed — click a row to see details`}
+                : `${submissions.length} test${submissions.length !== 1 ? "s" : ""} completed. Click a row to see details`}
             </p>
           </div>
         </div>

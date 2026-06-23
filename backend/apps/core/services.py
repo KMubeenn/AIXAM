@@ -15,22 +15,25 @@ class CoreService:
 
     @staticmethod
     @sync_to_async
-    def save_study_material(user_id,title,file_type,processed_content=''):
+    def save_study_material(user_id,title,file_type,processed_content='',origin_session_id=None):
         return StudyMaterial.objects.create(
             title=title,
             file_type=file_type,
             uploaded_by_id=user_id,
-            processed_content=processed_content
+            processed_content=processed_content,
+            origin_session_id=origin_session_id
         )
 
     @staticmethod
     @sync_to_async
     def get_user_materials(user_id):
-        materials=list(StudyMaterial.objects.filter(uploaded_by_id=user_id))
+        materials=list(StudyMaterial.objects.filter(uploaded_by_id=user_id).select_related('origin_session'))
         return [{
             'id':str(m.id),
             'title':m.title,
             'file_type':m.file_type,
+            'origin_session_id': str(m.origin_session.id) if m.origin_session else None,
+            'origin_session_title': m.origin_session.title if m.origin_session else None,
             'created_at':m.created_at.isoformat()
         } for m in materials]
 
@@ -38,12 +41,14 @@ class CoreService:
     @sync_to_async
     def get_material_detail(material_id):
         try:
-            m = StudyMaterial.objects.get(id=material_id)
+            m = StudyMaterial.objects.select_related('origin_session').get(id=material_id)
             return {
                 'id': str(m.id),
                 'title': m.title,
                 'file_type': m.file_type,
                 'content': m.processed_content,
+                'origin_session_id': str(m.origin_session.id) if m.origin_session else None,
+                'origin_session_title': m.origin_session.title if m.origin_session else None,
                 'created_at': m.created_at.isoformat()
             }
         except StudyMaterial.DoesNotExist:
@@ -437,16 +442,24 @@ class CoreService:
     @staticmethod
     @sync_to_async
     def get_teacher_assignments(user_id):
-        from apps.core.models import Assignment
+        from apps.core.models import Assignment, Submission
         assignments = list(Assignment.objects.filter(created_by_id=user_id).order_by('-created_at')[:50])
-        return [{
-            "id": str(a.id),
-            "title": a.title,
-            "course_id": a.course_id,
-            "deadline": a.deadline.isoformat() if a.deadline else None,
-            "total_marks": a.total_marks,
-            "created_at": a.created_at.isoformat()
-        } for a in assignments]
+        result = []
+        for a in assignments:
+            subs = list(Submission.objects.filter(assignment_id=a.id))
+            has_submissions = len(subs) > 0
+            is_graded = any(s.score is not None for s in subs) if has_submissions else False
+            result.append({
+                "id": str(a.id),
+                "title": a.title,
+                "course_id": a.course_id,
+                "deadline": a.deadline.isoformat() if a.deadline else None,
+                "total_marks": a.total_marks,
+                "created_at": a.created_at.isoformat(),
+                "has_submissions": has_submissions,
+                "is_graded": is_graded,
+            })
+        return result
 
     @staticmethod
     @sync_to_async
@@ -462,6 +475,7 @@ class CoreService:
             'id': str(q.id),
             'title': q.title,
             'question_count': q.questions.count(),
+            'total_marks': sum(question.points for question in q.questions.all()),
             'created_at': q.created_at.isoformat(),
         } for q in quizzes]
 

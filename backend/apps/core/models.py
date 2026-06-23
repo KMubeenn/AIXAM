@@ -29,6 +29,14 @@ class StudyMaterial(models.Model):
     )
     processed_content = models.TextField(blank=True, help_text="Extracted text from the file")
     summary = models.TextField(blank=True, help_text="AI generated summary")
+    origin_session = models.ForeignKey(
+        'chat.ChatSession',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='origin_materials',
+        help_text="The chat session where this file was uploaded"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

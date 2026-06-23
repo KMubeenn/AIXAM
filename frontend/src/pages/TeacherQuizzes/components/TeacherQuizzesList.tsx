@@ -2,155 +2,137 @@ import React, { useState } from "react";
 import {
   LuFileQuestion,
   LuTrash2,
-  LuFileText,
-  LuDownload,
+  LuEye,
+  LuX,
+  LuClock,
   LuLoader,
-  LuChevronDown,
-  LuChevronUp,
-  LuUser,
-  LuCircleAlert,
   LuCircleCheck,
-  LuSparkles,
 } from "react-icons/lu";
-import { useTeacherQuizzes, useDeleteQuiz, useBatchGrades, useGenerateClassReport } from "../../../hooks/useCore";
+import { useTeacherQuizzes, useDeleteQuiz, useQuizDetail } from "../../../hooks/useCore";
 
-// ── Batch Grades Panel ────────────────────────────────────────────────────────
+// ── Quiz Detail Modal ──────────────────────────────────────────────────────────
 
-const BatchGradesPanel: React.FC<{ assignmentId: string }> = ({ assignmentId }) => {
-  const { data, isLoading } = useBatchGrades(assignmentId);
-  const generateReport = useGenerateClassReport();
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const grades = data?.grades ?? [];
-
-  const handleDownloadReport = async () => {
-    try {
-      const report = await generateReport.mutateAsync({ assignmentId });
-      // Decode base64 and trigger download
-      const bytes = atob(report.file_base64);
-      const arr = new Uint8Array(bytes.length);
-      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-      const blob = new Blob([arr], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = report.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error("Report download failed:", e);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-2 mt-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-14 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (grades.length === 0) {
-    return (
-      <div className="text-center py-10 mt-4 bg-gray-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">
-        <LuSparkles className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
-        <p className="text-sm text-gray-400 dark:text-slate-500">No batch grading results yet for this assignment.</p>
-        <p className="text-xs text-gray-300 dark:text-slate-600 mt-1">Use the AI Chat to run batch grading first.</p>
-      </div>
-    );
-  }
-
-  const classAvg = grades.reduce((sum, g) => sum + (g.score ?? 0), 0) / grades.length;
+const QuizDetailModal: React.FC<{ quizId: string; onClose: () => void }> = ({ quizId, onClose }) => {
+  const { data: quizData, isLoading } = useQuizDetail(quizId);
+  const quiz = quizData;
 
   return (
-    <div className="mt-4 space-y-3">
-      {/* Summary bar */}
-      <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800">
-        <div>
-          <p className="text-xs text-indigo-500 dark:text-indigo-400 font-medium uppercase tracking-wider">Class Average</p>
-          <p className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">{classAvg.toFixed(1)}%</p>
-          <p className="text-xs text-indigo-400 dark:text-indigo-500">{grades.length} students graded</p>
-        </div>
-        <button
-          onClick={handleDownloadReport}
-          disabled={generateReport.isPending}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
-        >
-          {generateReport.isPending ? (
-            <LuLoader className="w-4 h-4 animate-spin" />
-          ) : (
-            <LuDownload className="w-4 h-4" />
-          )}
-          {generateReport.isPending ? "Generating..." : "Download PDF Report"}
-        </button>
-      </div>
-
-      {/* Per-student rows */}
-      {grades.map((g) => (
-        <div key={g.id} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <LuFileQuestion className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1">
+                {isLoading ? "Loading Quiz..." : quiz?.title}
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                Quiz Preview
+              </p>
+            </div>
+          </div>
           <button
-            className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors"
-            onClick={() => setExpandedId(expandedId === g.id ? null : g.id)}
+            onClick={onClose}
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-sm font-bold flex-shrink-0">
-                {g.student_name.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-gray-900 dark:text-white">{g.student_name}</p>
-                <p className="text-xs text-gray-400 dark:text-slate-500">{g.student_email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {g.is_late && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
-                  <LuCircleAlert className="w-3 h-3" /> Late
-                </span>
-              )}
-              <span className={`text-lg font-bold ${(g.score ?? 0) >= 50 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                {g.score !== null ? `${g.score}%` : "—"}
-              </span>
-              {expandedId === g.id ? (
-                <LuChevronUp className="w-4 h-4 text-gray-400" />
-              ) : (
-                <LuChevronDown className="w-4 h-4 text-gray-400" />
-              )}
-            </div>
+            <LuX className="w-5 h-5" />
           </button>
-
-          {expandedId === g.id && (
-            <div className="border-t border-gray-100 dark:border-slate-800 p-4 space-y-3">
-              {g.feedback && (
-                <div className="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">Overall Feedback</p>
-                  <p className="text-sm text-gray-700 dark:text-slate-300">{g.feedback}</p>
-                </div>
-              )}
-              {g.grading_details?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Question Breakdown</p>
-                  {g.grading_details.map((d, idx) => (
-                    <div key={idx} className="flex items-start gap-3 bg-gray-50 dark:bg-slate-800/50 rounded-lg p-3">
-                      <span className="flex-shrink-0 text-xs font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">
-                        Q{idx + 1}
-                      </span>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-700 dark:text-slate-300">{d.feedback}</p>
-                        <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                          {d.marks} / {d.max_marks} marks
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      ))}
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <LuLoader className="w-8 h-8 text-blue-500 animate-spin" />
+              <p className="text-sm text-gray-400">Loading quiz content...</p>
+            </div>
+          ) : quiz ? (
+            <>
+              {/* Meta Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-0.5">Total Questions</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {quiz.questions?.length ?? 0}
+                  </p>
+                </div>
+                {quiz.time_limit_minutes && (
+                  <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mb-0.5">Time Limit</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                      <LuClock className="w-4 h-4 text-blue-500" />
+                      {quiz.time_limit_minutes} min
+                    </p>
+                  </div>
+                )}
+                <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-0.5">Created Date</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white text-sm">
+                    {new Date(quiz.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Questions List */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300">
+                  Questions
+                </h3>
+                {quiz.questions?.map((q: any, idx: number) => {
+                  const [questionText, explanation] = (q.text || "").split("\n\nEXPLANATION:");
+                  return (
+                    <div
+                      key={q.id}
+                      className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-5 border border-gray-100 dark:border-slate-700 space-y-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">
+                            {questionText}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Choices */}
+                      {q.choices && q.choices.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-9">
+                          {q.choices.map((c: any) => (
+                            <div
+                              key={c.id}
+                              className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition-all ${
+                                c.is_correct
+                                  ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/30 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 font-semibold"
+                                  : "border-gray-100 bg-white dark:border-slate-800 dark:bg-slate-900 text-gray-600 dark:text-slate-400"
+                              }`}
+                            >
+                              {c.is_correct && <LuCircleCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />}
+                              <span>{c.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Explanation */}
+                      {explanation && (
+                        <div className="pl-9 text-xs text-gray-500 dark:text-slate-400 italic bg-blue-50/30 dark:bg-blue-950/10 p-2.5 rounded-lg border border-blue-50 dark:border-blue-900/20">
+                          <span className="font-semibold text-blue-600 dark:text-blue-400 not-italic mr-1">Explanation:</span>
+                          {explanation.trim()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 };
@@ -160,8 +142,7 @@ const BatchGradesPanel: React.FC<{ assignmentId: string }> = ({ assignmentId }) 
 const TeacherQuizzesList: React.FC = () => {
   const { data, isLoading } = useTeacherQuizzes();
   const deleteQuiz = useDeleteQuiz();
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
-  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
   const quizzes = data?.quizzes ?? [];
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -172,8 +153,11 @@ const TeacherQuizzesList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Quizzes Table */}
+    <>
+      {selectedQuizId && (
+        <QuizDetailModal quizId={selectedQuizId} onClose={() => setSelectedQuizId(null)} />
+      )}
+
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
         {isLoading ? (
           <div className="space-y-px">
@@ -188,7 +172,7 @@ const TeacherQuizzesList: React.FC = () => {
             </div>
             <h4 className="text-lg font-semibold text-gray-700 dark:text-slate-300 mb-1">No quizzes yet</h4>
             <p className="text-sm text-gray-400 dark:text-slate-500 max-w-xs">
-              Ask the AI agent to generate a quiz. Assignment quizzes will appear here.
+              Ask the AI agent to generate a quiz. Generated quizzes will appear here.
             </p>
           </div>
         ) : (
@@ -197,14 +181,19 @@ const TeacherQuizzesList: React.FC = () => {
               <thead className="bg-gray-50 dark:bg-slate-800 text-xs uppercase text-gray-500 dark:text-slate-500 font-semibold">
                 <tr>
                   <th className="px-6 py-4">Quiz Title</th>
-                  <th className="px-6 py-4">Questions</th>
+                  <th className="px-6 py-4">Type</th>
+                  <th className="px-6 py-4">Total Marks</th>
                   <th className="px-6 py-4">Created</th>
                   <th className="px-6 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                 {quizzes.map((q) => (
-                  <tr key={q.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group">
+                  <tr
+                    key={q.id}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                    onClick={() => setSelectedQuizId(q.id)}
+                  >
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                       <div className="flex items-center gap-2">
                         <LuFileQuestion className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -212,7 +201,12 @@ const TeacherQuizzesList: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">{q.question_count}</span>
+                      <span className="text-xs px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold">
+                        Quiz
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-semibold text-blue-600 dark:text-blue-400">
+                      {q.total_marks ?? q.question_count}
                     </td>
                     <td className="px-6 py-4 text-gray-400 dark:text-slate-500">
                       {new Date(q.created_at).toLocaleDateString()}
@@ -220,13 +214,13 @@ const TeacherQuizzesList: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => {
-                            setExpandedQuizId(q.id);
-                            setSelectedAssignmentId(q.id);
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedQuizId(q.id);
                           }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-all flex items-center gap-1"
                         >
-                          <LuFileText className="w-3 h-3" /> View Grades
+                          <LuEye className="w-3.5 h-3.5" /> View
                         </button>
                         <button
                           onClick={(e) => handleDelete(e, q.id)}
@@ -244,29 +238,7 @@ const TeacherQuizzesList: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Batch Grades panel */}
-      {selectedAssignmentId && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <LuSparkles className="w-4 h-4 text-indigo-500" />
-              AI Batch Grading Results
-            </h3>
-            <button
-              onClick={() => setSelectedAssignmentId(null)}
-              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
-            >
-              Close
-            </button>
-          </div>
-          <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">
-            Showing grades for the selected quiz's assignment.
-          </p>
-          <BatchGradesPanel assignmentId={selectedAssignmentId} />
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 

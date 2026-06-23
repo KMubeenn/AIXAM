@@ -10,6 +10,82 @@ import json
 
 
 # ──────────────────────────────────────────────
+# TEACHER ANALYTICS
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_teacher_analytics_view(request):
+    """
+    Return real analytics data for the teacher dashboard:
+    - Total assignments, quizzes, submissions
+    - Class average score
+    - Top and bottom performing topics (derived from StudentPerformance)
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        from apps.core.models import Assignment, Quiz, Submission, StudentPerformance
+        from django.db.models import Avg, Count
+
+        # Assignments & quizzes created by this teacher
+        assignment_count = await sync_to_async(
+            lambda: Assignment.objects.filter(created_by_id=user.id).count()
+        )()
+        quiz_count = await sync_to_async(
+            lambda: Quiz.objects.filter(created_by_id=user.id, quiz_type='assignment_quiz').count()
+        )()
+
+        # Submissions for assignments this teacher created
+        teacher_assignment_ids = await sync_to_async(
+            lambda: list(Assignment.objects.filter(created_by_id=user.id).values_list('id', flat=True))
+        )()
+
+        submission_stats = await sync_to_async(
+            lambda: Submission.objects.filter(
+                assignment_id__in=teacher_assignment_ids
+            ).aggregate(total=Count('id'), avg=Avg('score'))
+        )()
+
+        total_submissions = submission_stats.get('total') or 0
+        class_avg = round(submission_stats.get('avg') or 0, 1)
+
+        # Top topics from StudentPerformance for students in this class
+        topic_data = await sync_to_async(
+            lambda: list(
+                StudentPerformance.objects.values('topic')
+                .annotate(avg_score=Avg('average_score'), count=Count('id'))
+                .order_by('-avg_score')[:10]
+            )
+        )()
+
+        strongest = topic_data[0]['topic'] if topic_data else 'N/A'
+        weakest = topic_data[-1]['topic'] if len(topic_data) > 1 else 'N/A'
+        strongest_avg = round(topic_data[0]['avg_score'], 1) if topic_data else 0
+        weakest_avg = round(topic_data[-1]['avg_score'], 1) if len(topic_data) > 1 else 0
+
+        return JsonResponse({
+            'assignment_count': assignment_count,
+            'quiz_count': quiz_count,
+            'total_submissions': total_submissions,
+            'class_average': class_avg,
+            'strongest_topic': strongest,
+            'strongest_avg': strongest_avg,
+            'weakest_topic': weakest,
+            'weakest_avg': weakest_avg,
+            'topics': [{
+                'topic': t['topic'],
+                'avg_score': round(t['avg_score'], 1),
+                'student_count': t['count']
+            } for t in topic_data]
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ──────────────────────────────────────────────
 # FLASHCARDS
 # ──────────────────────────────────────────────
 
@@ -359,6 +435,23 @@ async def list_google_courses_view(request):
         from apps.chat.services.utilities.ClassroomService import ClassroomService, ClassroomServiceError
         courses = await sync_to_async(ClassroomService.list_courses)(user)
         return JsonResponse({'courses': courses})
+    except ClassroomServiceError as e:
+        return JsonResponse({'error': str(e), 'not_authorized': True}, status=403)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def list_google_coursework_view(request, course_id):
+    """List all coursework (assignments) in a specific Google Classroom course."""
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        from apps.chat.services.utilities.ClassroomService import ClassroomService, ClassroomServiceError
+        coursework = await sync_to_async(ClassroomService.list_coursework)(user, course_id)
+        return JsonResponse({'coursework': coursework})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -438,13 +531,31 @@ async def patch_grade_view(request, course_id, coursework_id, submission_id):
 async def get_batch_grades_view(request, assignment_id):
     """
     Return all student submissions and their AI-graded details for a specific assignment.
-    Used for reviewing past batch grading results.
+    Used for reviewing past batch grading results. Resolves Quiz ID to Assignment ID if needed.
     """
     try:
         user = await sync_to_async(get_user_from_request)(request=request)
         if not user or user.role != 'teacher':
             return JsonResponse({'error': 'Unauthorized'}, status=401)
-        grades = await CoreService.get_batch_grades_for_assignment(assignment_id)
+
+        from apps.core.models import Assignment, Quiz
+        real_assignment_id = assignment_id
+        try:
+            await sync_to_async(Assignment.objects.get)(id=assignment_id)
+        except Assignment.DoesNotExist:
+            try:
+                quiz = await sync_to_async(Quiz.objects.get)(id=assignment_id)
+                linked_assignment = await sync_to_async(
+                    lambda: Assignment.objects.filter(quiz=quiz).first()
+                )()
+                if linked_assignment:
+                    real_assignment_id = linked_assignment.id
+                else:
+                    return JsonResponse({'error': 'No assignment links to this quiz'}, status=404)
+            except Quiz.DoesNotExist:
+                return JsonResponse({'error': 'Invalid ID'}, status=404)
+
+        grades = await CoreService.get_batch_grades_for_assignment(real_assignment_id)
         return JsonResponse({'grades': grades})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -454,24 +565,36 @@ async def get_batch_grades_view(request, assignment_id):
 @require_http_methods(['POST'])
 async def generate_class_report_view(request, assignment_id):
     """
-    Generate a downloadable PDF class performance report for a given assignment.
-    Accepts optional pre-computed grades_data in the body; otherwise fetches from DB.
-    Body (optional): {
-        "grades_data": { ... BatchGradingResult ... }
-    }
-    Returns: { "filename": str, "mime_type": "application/pdf", "file_base64": str }
+    Generate a downloadable PDF class performance report for a given assignment/quiz.
     """
     try:
         user = await sync_to_async(get_user_from_request)(request=request)
         if not user or user.role != 'teacher':
             return JsonResponse({'error': 'Unauthorized'}, status=401)
 
+        from apps.core.models import Assignment, Quiz
+        real_assignment_id = assignment_id
+        try:
+            await sync_to_async(Assignment.objects.get)(id=assignment_id)
+        except Assignment.DoesNotExist:
+            try:
+                quiz = await sync_to_async(Quiz.objects.get)(id=assignment_id)
+                linked_assignment = await sync_to_async(
+                    lambda: Assignment.objects.filter(quiz=quiz).first()
+                )()
+                if linked_assignment:
+                    real_assignment_id = linked_assignment.id
+                else:
+                    return JsonResponse({'error': 'No assignment links to this quiz'}, status=404)
+            except Quiz.DoesNotExist:
+                return JsonResponse({'error': 'Invalid ID'}, status=404)
+
         body = json.loads(request.body) if request.body else {}
         grades_data = body.get('grades_data')
 
         if not grades_data:
             # Build grades_data from DB submissions
-            submissions = await CoreService.get_batch_grades_for_assignment(assignment_id)
+            submissions = await CoreService.get_batch_grades_for_assignment(real_assignment_id)
             if not submissions:
                 return JsonResponse({'error': 'No grading data found for this assignment'}, status=404)
 
@@ -496,9 +619,8 @@ async def generate_class_report_view(request, assignment_id):
             }
 
         # Get assignment title for the report
-        from apps.core.models import Assignment
         try:
-            assignment = await sync_to_async(Assignment.objects.get)(id=assignment_id)
+            assignment = await sync_to_async(Assignment.objects.get)(id=real_assignment_id)
             assignment_title = assignment.title
         except Assignment.DoesNotExist:
             assignment_title = 'Assignment'
@@ -506,6 +628,68 @@ async def generate_class_report_view(request, assignment_id):
         from apps.chat.services.utilities.ReportGenerator import generate_class_report_pdf
         report = await sync_to_async(generate_class_report_pdf)(assignment_title, grades_data)
         return JsonResponse(report)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def grade_submission_view(request, submission_id):
+    """
+    Allow teacher to grade a local submission.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        body = json.loads(request.body)
+        score = body.get('score')
+        feedback = body.get('feedback', '')
+        if score is None:
+            return JsonResponse({'error': 'score is required'}, status=400)
+        from apps.core.models import Submission
+        submission = await sync_to_async(Submission.objects.select_related('assignment').get)(id=submission_id)
+        if submission.assignment and submission.assignment.created_by_id != user.id:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+        submission.score = float(score)
+        submission.feedback = feedback
+        await sync_to_async(submission.save)()
+        return JsonResponse({'message': 'Submission graded successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def post_report_to_classroom_view(request, assignment_id):
+    """
+    Generate performance summary and post it as announcement in linked Google Classroom.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        from apps.core.models import Assignment
+        assignment = await sync_to_async(Assignment.objects.get)(id=assignment_id)
+        if assignment.created_by_id != user.id:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+        if not assignment.course_id:
+            return JsonResponse({'error': 'This assignment is not linked to a Google Classroom course'}, status=400)
+        submissions = await CoreService.get_batch_grades_for_assignment(assignment_id)
+        if not submissions:
+            return JsonResponse({'error': 'No submissions found to generate report'}, status=400)
+        total_score = sum(s.get('score') or 0 for s in submissions)
+        class_avg = total_score / len(submissions) if submissions else 0
+        text = f"Class performance report for Assignment: {assignment.title}\n"
+        text += f"Class Average: {class_avg:.1f}%\n\n"
+        text += "Student Grades:\n"
+        for s in submissions:
+            score = s.get('score')
+            score_str = f"{score}%" if score is not None else "Not graded"
+            text += f"- {s['student_name']}: {score_str}\n"
+        from apps.chat.services.utilities.ClassroomService import ClassroomService
+        await sync_to_async(ClassroomService.post_announcement)(user, assignment.course_id, text)
+        return JsonResponse({'message': 'Report posted to Google Classroom successfully'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 

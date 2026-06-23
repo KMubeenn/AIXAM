@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FiSend, FiPaperclip, FiArrowLeft, FiMoreVertical, FiLayers, FiFileText, FiCheckCircle, FiDownload, FiClipboard } from "react-icons/fi";
+import { FiSend, FiPaperclip, FiArrowLeft, FiMoreVertical, FiLayers, FiFileText, FiCheckCircle, FiDownload, FiClipboard, FiFolder, FiX } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useChat } from "../../hooks/useChat";
 import StudentSidebar from "../StudentDashboard/components/Sidebar";
@@ -8,6 +8,7 @@ import { useAuthStore } from "../../store/useAuthStore";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SubmissionDetailModal } from "../StudentDashboard/components/SubmissionsHistory";
+import { useMaterials } from "../../hooks/useCore";
 
 const Chat: React.FC = () => {
   const navigate = useNavigate();
@@ -15,11 +16,16 @@ const Chat: React.FC = () => {
   const { user } = useAuthStore();
   const isTeacher = user?.role === 'teacher';
   const { messages, isStreaming, sendMessage, setMessages, loadSession, setSessionId, sessionId } = useChat();
+  const { data: materialsData } = useMaterials();
   const [input, setInput] = useState("");
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [showAttachmentDropdown, setShowAttachmentDropdown] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const gradingFiredRef = useRef<string | null>(null);
 
   const scrollToBottom = () => {
@@ -68,16 +74,53 @@ const Chat: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
+  // Close attachment dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowAttachmentDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Pre-attach material if redirected with state from dashboard/materials page
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.study_material_id) {
+      setSelectedMaterial({
+        id: state.study_material_id,
+        title: state.title || "Selected Document",
+        file_type: state.file_type || "pdf"
+      });
+      // Clear route state so it doesn't re-attach on subsequent actions
+      navigate(location.pathname, { replace: true, state: { ...state, study_material_id: undefined } });
+    }
+  }, [location.state, navigate, location.pathname]);
+
   const handleSend = () => {
-    if (!input.trim() || isStreaming) return;
-    sendMessage({ message: input });
+    if (isStreaming) return;
+    const hasAttachment = pendingFile || selectedMaterial;
+    if (!input.trim() && !hasAttachment) return;
+
+    const msg = input.trim() || (pendingFile ? `Please analyze my uploaded file: ${pendingFile.name}` : `Please analyze my attached document: ${selectedMaterial.title}`);
+
+    sendMessage({ 
+      message: msg,
+      study_material_id: selectedMaterial?.id || undefined,
+      files: pendingFile ? [pendingFile] : undefined
+    });
     setInput("");
+    setSelectedMaterial(null);
+    setPendingFile(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      sendMessage({ message: `I've uploaded a file: ${files[0].name}`, files: Array.from(files) });
+      setPendingFile(files[0]);
+      setSelectedMaterial(null);
     }
   };
 
@@ -410,6 +453,61 @@ const Chat: React.FC = () => {
                               </div>
                             );
                           })()}
+
+                          {output.type === 'slide_outline' && output.data && (() => {
+                            const slides = output.data.slides || [];
+                            return (
+                              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+                                      <FiLayers className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Slide Outline Ready</span>
+                                      <div className="text-sm text-gray-600 dark:text-slate-300">
+                                        {slides.length} slides generated
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                {slides.length > 0 && (
+                                  <div className="mt-3 divide-y divide-indigo-100 dark:divide-indigo-900 bg-white dark:bg-slate-800 rounded-lg max-h-60 overflow-y-auto border border-indigo-100 dark:border-indigo-900">
+                                    {slides.map((slide: any, sIdx: number) => (
+                                      <div key={sIdx} className="p-3 text-xs">
+                                        <h4 className="font-bold text-gray-900 dark:text-white mb-1">Slide {sIdx + 1}: {slide.title}</h4>
+                                        <ul className="list-disc pl-4 text-gray-600 dark:text-slate-300 space-y-1">
+                                          {(slide.points || []).map((pt: string, pIdx: number) => (
+                                            <li key={pIdx}>{pt}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {output.type === 'teacher_quiz' && (
+                            <div className="p-4 bg-violet-50 dark:bg-violet-900/30 border border-violet-100 dark:border-violet-800 rounded-xl flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-violet-600 flex items-center justify-center text-white">
+                                  <FiClipboard className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Teacher Quiz Created</span>
+                                  <div className="text-sm text-gray-600 dark:text-slate-300">Ready to assign to class</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => navigate('/teacher-quizzes')}
+                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
+                              >
+                                View Quiz
+                              </button>
+                            </div>
+                          )}
                         </React.Fragment>
                       ))}
                     </div>
@@ -552,7 +650,94 @@ const Chat: React.FC = () => {
 
         {/* Input Area */}
         <footer className="p-6 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800">
-          <div className="max-w-4xl mx-auto relative">
+          <div className="max-w-4xl mx-auto relative" ref={dropdownRef}>
+            
+            {/* Attachment Chip Badge */}
+            {selectedMaterial && (
+              <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 px-4 py-2 rounded-xl mb-3 animate-in slide-in-from-bottom-2 duration-205">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-600/10 text-indigo-600 flex items-center justify-center font-bold text-[10px] uppercase">
+                    {selectedMaterial.file_type}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Attached Document</span>
+                    <p className="text-xs font-semibold text-gray-800 dark:text-white truncate max-w-[250px] sm:max-w-md">
+                      {selectedMaterial.title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedMaterial(null)}
+                  className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full text-indigo-500 hover:text-indigo-700 transition-colors"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Attachment Chip Badge for Local Computer File */}
+            {pendingFile && (
+              <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900 px-4 py-2 rounded-xl mb-3 animate-in slide-in-from-bottom-2 duration-205">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-600/10 text-emerald-600 flex items-center justify-center font-bold text-[10px] uppercase">
+                    {pendingFile.name.split('.').pop() || 'file'}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Attached from Computer</span>
+                    <p className="text-xs font-semibold text-gray-800 dark:text-white truncate max-w-[250px] sm:max-w-md">
+                      {pendingFile.name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPendingFile(null)}
+                  className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-full text-emerald-500 hover:text-emerald-700 transition-colors"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Attachment Browser Dropdown */}
+            {showAttachmentDropdown && (
+              <div className="absolute bottom-20 left-0 z-30 bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl py-3 w-80 max-h-72 overflow-y-auto animate-in slide-in-from-bottom-5 duration-200">
+                <div className="px-4 pb-2 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Attach from Library</span>
+                  <span className="text-[10px] text-gray-500">{materialsData?.materials?.length || 0} files</span>
+                </div>
+                <div className="divide-y divide-gray-50 dark:divide-slate-800/50">
+                  {(!materialsData?.materials || materialsData.materials.length === 0) ? (
+                    <div className="p-4 text-center text-xs text-gray-400 italic">
+                      No materials uploaded yet.
+                    </div>
+                  ) : (
+                    materialsData.materials.map((m: any) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedMaterial(m);
+                          setShowAttachmentDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-900 flex items-center gap-3 transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-gray-150 dark:bg-slate-800 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/30 text-gray-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 flex items-center justify-center font-bold text-[10px] uppercase transition-colors">
+                          {m.file_type}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-gray-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            {m.title}
+                          </p>
+                          <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">
+                            {new Date(m.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             <input 
               type="file"
               ref={fileInputRef}
@@ -561,12 +746,26 @@ const Chat: React.FC = () => {
               multiple
             />
             <div className="flex items-center gap-3 bg-gray-50 dark:bg-slate-950 p-2 rounded-2xl border border-gray-200 dark:border-slate-800 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/10 transition-all">
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="p-3 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-              >
-                <FiPaperclip className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload from computer"
+                  className="p-3 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  <FiPaperclip className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => setShowAttachmentDropdown(!showAttachmentDropdown)}
+                  title="Attach from library"
+                  className={`p-3 transition-colors ${
+                    showAttachmentDropdown 
+                      ? 'text-indigo-600 dark:text-indigo-400' 
+                      : 'text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                  }`}
+                >
+                  <FiFolder className="w-5 h-5" />
+                </button>
+              </div>
               <textarea 
                 rows={1}
                 placeholder="Ask anything..."
@@ -577,9 +776,9 @@ const Chat: React.FC = () => {
               />
               <button 
                 onClick={handleSend}
-                disabled={!input.trim() || isStreaming}
+                disabled={(!input.trim() && !pendingFile && !selectedMaterial) || isStreaming}
                 className={`p-3 rounded-xl transition-all ${
-                  input.trim() && !isStreaming 
+                  (input.trim() || pendingFile || selectedMaterial) && !isStreaming 
                     ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700' 
                     : 'bg-gray-200 dark:bg-slate-800 text-gray-400 cursor-not-allowed'
                 }`}

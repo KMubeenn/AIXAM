@@ -95,7 +95,7 @@ class StudentAgent():
     def conversation(self,state:StudentState)->StudentState:
         messages=[state['system_prompt']]+list(state['messages'])
         if state.get('files_input'):
-            file_context=SystemMessage(content=f"The user has uploaded a document. Its content is available for reference:\n\n{state['files_input']}")
+            file_context=SystemMessage(content=f"You have direct access to the contents of the user's uploaded document. You MUST read, reference, and summarize this text as requested. Do NOT state that you cannot open or read files, as the text has already been parsed and is provided to you below:\n\n{state['files_input']}")
             messages.insert(1,file_context)
         
         max_retries=3

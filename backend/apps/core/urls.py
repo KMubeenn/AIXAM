@@ -16,9 +16,11 @@ from apps.core.views import (
     get_teacher_quizzes,
     # Teacher — Google Classroom
     list_google_courses_view, list_google_submissions_view,
-    fetch_submission_content_view, patch_grade_view,
+    fetch_submission_content_view, patch_grade_view, list_google_coursework_view,
     # Teacher — Batch Grades & Report
-    get_batch_grades_view, generate_class_report_view,
+    get_batch_grades_view, generate_class_report_view, grade_submission_view, post_report_to_classroom_view,
+    # Teacher — Analytics
+    get_teacher_analytics_view,
 )
 
 urlpatterns = [
@@ -52,13 +54,19 @@ urlpatterns = [
     path('assignments/<uuid:assignment_id>/submissions/', get_assignment_submissions, name='assignment_submissions'),
     path('assignments/<uuid:assignment_id>/grades/', get_batch_grades_view, name='batch_grades'),
     path('assignments/<uuid:assignment_id>/report/', generate_class_report_view, name='class_report'),
+    path('assignments/<uuid:assignment_id>/post-report/', post_report_to_classroom_view, name='post_classroom_report'),
+    path('submissions/<uuid:submission_id>/grade/', grade_submission_view, name='grade_submission'),
 
     # ── Teacher: Quizzes ───────────────────────────────────────────────────
     path('teacher/quizzes/', get_teacher_quizzes, name='teacher_quizzes'),
 
     # ── Teacher: Google Classroom ──────────────────────────────────────────
     path('classroom/courses/', list_google_courses_view, name='classroom_courses'),
+    path('classroom/courses/<str:course_id>/coursework/', list_google_coursework_view, name='classroom_coursework'),
     path('classroom/courses/<str:course_id>/coursework/<str:coursework_id>/submissions/', list_google_submissions_view, name='classroom_submissions'),
     path('classroom/courses/<str:course_id>/coursework/<str:coursework_id>/submissions/<str:submission_id>/content/', fetch_submission_content_view, name='submission_content'),
     path('classroom/courses/<str:course_id>/coursework/<str:coursework_id>/submissions/<str:submission_id>/grade/', patch_grade_view, name='patch_grade'),
+
+    # ── Teacher: Analytics ─────────────────────────────────────────────────
+    path('teacher/analytics/', get_teacher_analytics_view, name='teacher_analytics'),
 ]

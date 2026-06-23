@@ -54,6 +54,16 @@ class ClassroomService:
             raise ClassroomServiceError(f"Failed to list courses: {str(e)}")
 
     @staticmethod
+    def list_coursework(user: User, course_id: str):
+        try:
+            service = ClassroomService.get_service(user)
+            results = service.courses().courseWork().list(courseId=course_id).execute()
+            coursework = results.get('courseWork', [])
+            return [{"id": cw.get("id"), "title": cw.get("title"), "maxPoints": cw.get("maxPoints")} for cw in coursework]
+        except Exception as e:
+            raise ClassroomServiceError(f"Failed to list coursework: {str(e)}")
+
+    @staticmethod
     def post_assignment(user: User, course_id: str, title: str, description: str, max_points: float = 100):
         try:
             service = ClassroomService.get_service(user)

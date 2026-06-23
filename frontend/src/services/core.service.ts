@@ -12,6 +12,8 @@ export interface Assignment {
   course_id?: string;
   deadline: string;
   created_at: string;
+  has_submissions?: boolean;
+  is_graded?: boolean;
 }
 
 export interface Question {
@@ -84,6 +86,9 @@ export interface Material {
   id: string;
   title: string;
   file_type: string;
+  origin_session_id?: string | null;
+  origin_session_title?: string | null;
+  content?: string;
   created_at: string;
 }
 
@@ -107,6 +112,7 @@ export interface TeacherQuiz {
   id: string;
   title: string;
   question_count: number;
+  total_marks: number;
   created_at: string;
 }
 
@@ -262,6 +268,11 @@ export const CoreService = {
     return response.data;
   },
 
+  async getMaterialDetail(id: string): Promise<Material> {
+    const response = await api.get(`/core/materials/${id}/`);
+    return response.data;
+  },
+
   // ── Performance ──────────────────────────────
   async getPerformance(): Promise<{ performance: PerformanceStats }> {
     const response = await api.get('/core/performance/');
@@ -324,6 +335,11 @@ export const CoreService = {
     return response.data;
   },
 
+  async getClassroomCoursework(courseId: string): Promise<{ coursework: { id: string; title: string; maxPoints?: number }[] }> {
+    const response = await api.get(`/core/classroom/courses/${courseId}/coursework/`);
+    return response.data;
+  },
+
   async getClassroomSubmissions(courseId: string, courseworkId: string): Promise<{ submissions: ClassroomSubmission[] }> {
     const response = await api.get(`/core/classroom/courses/${courseId}/coursework/${courseworkId}/submissions/`);
     return response.data;
@@ -339,6 +355,32 @@ export const CoreService = {
       `/core/classroom/courses/${courseId}/coursework/${courseworkId}/submissions/${submissionId}/grade/`,
       { assigned_grade: assignedGrade, ...(draftGrade !== undefined ? { draft_grade: draftGrade } : {}) }
     );
+    return response.data;
+  },
+
+  async gradeLocalSubmission(submissionId: string, score: number, feedback: string): Promise<any> {
+    const res = await api.post(`/core/submissions/${submissionId}/grade/`, { score, feedback });
+    return res.data;
+  },
+
+  async postClassroomReport(assignmentId: string): Promise<any> {
+    const res = await api.post(`/core/assignments/${assignmentId}/post-report/`);
+    return res.data;
+  },
+
+  // ── Teacher: Analytics ───────────────────────
+  async getTeacherAnalytics(): Promise<{
+    assignment_count: number;
+    quiz_count: number;
+    total_submissions: number;
+    class_average: number;
+    strongest_topic: string;
+    strongest_avg: number;
+    weakest_topic: string;
+    weakest_avg: number;
+    topics: { topic: string; avg_score: number; student_count: number }[];
+  }> {
+    const response = await api.get('/core/teacher/analytics/');
     return response.data;
   },
 };

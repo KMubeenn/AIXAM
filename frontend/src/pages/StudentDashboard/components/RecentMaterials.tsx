@@ -8,12 +8,14 @@ import {
   LuTrash2,
 } from "react-icons/lu";
 import { useMaterials, useDeleteMaterial } from "../../../hooks/useCore";
+import DocumentViewerModal from "../../StudyMaterials/components/DocumentViewerModal";
 
 const RecentMaterials: React.FC = () => {
   const { data, isLoading } = useMaterials();
   const deleteMaterial = useDeleteMaterial();
   const materials = data?.materials || [];
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -80,6 +82,7 @@ const RecentMaterials: React.FC = () => {
             {materials.map((material) => (
               <div
                 key={material.id}
+                onClick={() => setSelectedMaterialId(material.id)}
                 className="relative bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500 hover:shadow-md transition-all group cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-3">
@@ -122,6 +125,11 @@ const RecentMaterials: React.FC = () => {
                 <p className="text-xs text-gray-500 dark:text-slate-400 uppercase">
                   {material.file_type} • {new Date(material.created_at).toLocaleDateString()}
                 </p>
+                {material.origin_session_title && (
+                  <p className="text-[10px] text-indigo-500 dark:text-indigo-400 font-medium truncate mt-1">
+                    Via: {material.origin_session_title}
+                  </p>
+                )}
               </div>
             ))}
 
@@ -137,6 +145,13 @@ const RecentMaterials: React.FC = () => {
           </>
         )}
       </div>
+
+      {selectedMaterialId && (
+        <DocumentViewerModal
+          materialId={selectedMaterialId}
+          onClose={() => setSelectedMaterialId(null)}
+        />
+      )}
     </div>
   );
 };

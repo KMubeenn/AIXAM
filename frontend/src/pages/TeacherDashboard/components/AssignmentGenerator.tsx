@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   LuWand,
   LuCloudUpload,
@@ -17,11 +18,14 @@ import {
 import { ChatService } from "../../../services/chat.service";
 
 const AssignmentGenerator: React.FC = () => {
+  const navigate = useNavigate();
   const [files, setFiles] = useState<File[]>([]);
   const [assignmentType, setAssignmentType] = useState("Multiple Choice Quiz");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedDraft, setGeneratedDraft] = useState<string>("");
   const [structuredData, setStructuredData] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,11 +34,71 @@ const AssignmentGenerator: React.FC = () => {
     }
   };
 
+  const formatStructuredData = (structured: any): string => {
+    if (!structured || !structured.data) return "";
+    const data = structured.data;
+    
+    if (structured.type === "teacher_quiz") {
+      const questions = Array.isArray(data) ? data : data.questions || [];
+      return questions.map((q: any, idx: number) => {
+        let text = `Q${idx + 1}. ${q.question || ""}\n`;
+        if (q.options) {
+          Object.entries(q.options).forEach(([key, val]) => {
+            text += `  ${key}) ${val}\n`;
+          });
+        }
+        text += `Correct Answer: ${q.answer || ""}\n`;
+        if (q.explanation) {
+          text += `Explanation: ${q.explanation}\n`;
+        }
+        return text;
+      }).join("\n");
+    }
+    
+    if (structured.type === "assignment") {
+      const title = data.title || "Assignment";
+      const totalMarks = data.total_marks || 100;
+      const questions = data.questions || [];
+      let text = `Title: ${title}\nTotal Marks: ${totalMarks}\n\n`;
+      questions.forEach((q: any, idx: number) => {
+        text += `Q${idx + 1}. ${q.question || ""} (Marks: ${q.marks || 1})\n`;
+        if (q.rubric) {
+          text += `Rubric: ${q.rubric}\n`;
+        }
+        text += "\n";
+      });
+      return text;
+    }
+    
+    if (structured.type === "slide_outline") {
+      const title = data.presentation_title || "Presentation";
+      const slides = data.slides || [];
+      let text = `Presentation Title: ${title}\n\n`;
+      slides.forEach((s: any) => {
+        text += `--- Slide ${s.slide_number || 1}: ${s.title || ""} ---\n`;
+        if (Array.isArray(s.bullet_points)) {
+          s.bullet_points.forEach((bp: string) => {
+            text += `* ${bp}\n`;
+          });
+        }
+        if (s.speaker_notes) {
+          text += `Speaker Notes: ${s.speaker_notes}\n`;
+        }
+        text += "\n";
+      });
+      return text;
+    }
+    
+    return JSON.stringify(data, null, 2);
+  };
+
   const handleGenerate = async () => {
     if (files.length === 0) return;
     setIsGenerating(true);
     setGeneratedDraft("");
     setStructuredData(null);
+    setIsPublished(false);
+    setIsEditing(false);
 
     try {
       await ChatService.sendMessageStream(
@@ -48,6 +112,10 @@ const AssignmentGenerator: React.FC = () => {
         },
         (data) => {
           setStructuredData(data);
+          const formatted = formatStructuredData(data);
+          if (formatted) {
+            setGeneratedDraft(formatted);
+          }
         },
         () => {}
       );
@@ -56,6 +124,24 @@ const AssignmentGenerator: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handlePublish = () => {
+    setIsPublished(true);
+    setTimeout(() => {
+      if (structuredData?.type === "teacher_quiz") {
+        navigate("/teacher-quizzes");
+      } else {
+        navigate("/teacher-assignments");
+      }
+    }, 1500);
+  };
+
+  const getStepText = () => {
+    if (isGenerating) return "Generating...";
+    if (isPublished) return "Step 3 of 3: Published";
+    if (generatedDraft || structuredData) return "Step 2 of 3: Preview & Edit";
+    return "Step 1 of 3: Upload Material";
   };
 
   return (
@@ -71,8 +157,8 @@ const AssignmentGenerator: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">
-            {isGenerating ? "Generating..." : "Step 1 of 3"}
+          <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1 rounded-full uppercase tracking-wider">
+            {getStepText()}
           </span>
         </div>
       </div>
@@ -168,29 +254,62 @@ const AssignmentGenerator: React.FC = () => {
             <h3 className="font-semibold text-gray-900 dark:text-white">
               2. Preview & Edit
             </h3>
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center">
-                <LuPencil className="w-4 h-4 inline mr-1" /> Edit
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm flex items-center">
-                <LuSend className="w-4 h-4 inline mr-1" /> Publish
-              </button>
-            </div>
+            {(generatedDraft || structuredData) && (
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsEditing(!isEditing)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-all flex items-center ${
+                    isEditing 
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-600 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400" 
+                      : "text-gray-600 border-gray-300 dark:text-slate-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <LuPencil className="w-4 h-4 inline mr-1" /> {isEditing ? "View Preview" : "Edit"}
+                </button>
+                <button 
+                  onClick={handlePublish}
+                  disabled={isPublished}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-green-800 rounded-lg shadow-sm flex items-center transition-colors"
+                >
+                  {isPublished ? (
+                    <>
+                      <LuCheck className="w-4 h-4 inline mr-1" /> Published
+                    </>
+                  ) : (
+                    <>
+                      <LuSend className="w-4 h-4 inline mr-1" /> Publish
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Document Preview */}
           <div className="border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-8 min-h-[500px] bg-white dark:bg-slate-900 relative">
-            <div className="max-w-2xl mx-auto">
-              {generatedDraft || structuredData ? (
-                <div className="whitespace-pre-wrap font-inter text-gray-800 dark:text-slate-200">
-                  {generatedDraft}
-                  {structuredData && (
-                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
-                      <p className="text-sm font-bold text-green-600 dark:text-green-400 mb-2">Structured Content Received:</p>
-                      <pre className="text-xs overflow-x-auto">{JSON.stringify(structuredData.data, null, 2)}</pre>
-                    </div>
-                  )}
+            {isPublished && (
+              <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 animate-fade-in">
+                <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-full mb-3 text-green-600 dark:text-green-400 animate-bounce">
+                  <LuCheck className="w-10 h-10" />
                 </div>
+                <h4 className="text-xl font-bold text-gray-900 dark:text-white">Published Successfully!</h4>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Redirecting to management page...</p>
+              </div>
+            )}
+
+            <div className="max-w-2xl mx-auto h-full">
+              {generatedDraft || structuredData ? (
+                isEditing ? (
+                  <textarea
+                    value={generatedDraft}
+                    onChange={(e) => setGeneratedDraft(e.target.value)}
+                    className="w-full min-h-[450px] p-6 font-mono text-sm border border-gray-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none"
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap font-inter text-gray-850 dark:text-slate-200 leading-relaxed">
+                    {generatedDraft}
+                  </div>
+                )
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-30 mt-20">
                    <LuFileText className="w-16 h-16 mb-4" />

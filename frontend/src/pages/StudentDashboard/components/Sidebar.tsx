@@ -191,7 +191,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <LuFileCheck className="w-5 h-5" />
             Mock Tests
           </Link>
-          <Link
+          {/* <Link
             to="/analytics"
             className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
               isActive("/analytics") 
@@ -201,7 +201,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <LuActivity className="w-5 h-5" />
             Analytics
-          </Link>
+          </Link> */}
         </div>
       </nav>
 

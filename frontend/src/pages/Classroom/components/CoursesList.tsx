@@ -19,6 +19,7 @@ import {
   useClassroomSubmissions,
   useFetchSubmissionContent,
   usePushGrade,
+  useClassroomCoursework,
 } from "../../../hooks/useCore";
 import { ClassroomSubmission } from "../../../services/core.service";
 import { useAuthStore } from "../../../store/useAuthStore";
@@ -196,7 +197,7 @@ const SubmissionsList: React.FC<{ courseId: string; courseworkId: string; course
   courseworkId,
   courseworkName,
 }) => {
-  const { data, isLoading, refetch, isRefetching } = useClassroomSubmissions(courseId, courseworkId);
+  const { data, isLoading, isError, error, refetch, isRefetching } = useClassroomSubmissions(courseId, courseworkId);
   const [selectedSubmission, setSelectedSubmission] = useState<ClassroomSubmission | null>(null);
   const submissions = data?.submissions ?? [];
 
@@ -231,6 +232,10 @@ const SubmissionsList: React.FC<{ courseId: string; courseworkId: string; course
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-12 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ))}
+        </div>
+      ) : isError ? (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800/30 text-sm">
+          Failed to load submissions: {(error as any)?.response?.data?.error || error.message || "Unknown error"}
         </div>
       ) : submissions.length === 0 ? (
         <div className="text-center py-8 bg-gray-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">
@@ -296,6 +301,10 @@ const CoursesList: React.FC = () => {
   const [courseworkId, setCourseworkId] = useState<string>("");
   const [courseworkIdInput, setCourseworkIdInput] = useState<string>("");
   const courses = data?.courses ?? [];
+  const { data: courseworkData, isLoading: isCourseworkLoading } = useClassroomCoursework(
+    selectedCourse?.id ?? null
+  );
+  const courseworks = courseworkData?.coursework ?? [];
   const isNotConnected = isError && String((error as any)?.response?.data?.error ?? "").toLowerCase().includes("not authorized");
 
   if (isLoading) {
@@ -373,29 +382,55 @@ const CoursesList: React.FC = () => {
       {selectedCourse && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6">
           <h3 className="font-bold text-gray-900 dark:text-white mb-4">
-            Submissions — <span className="text-indigo-600 dark:text-indigo-400">{selectedCourse.name}</span>
+            Submissions: <span className="text-indigo-600 dark:text-indigo-400">{selectedCourse.name}</span>
           </h3>
-          <div className="flex items-center gap-3 mb-4">
-            <input
-              type="text"
-              placeholder="Enter Coursework / Assignment ID from Google Classroom"
-              value={courseworkIdInput}
-              onChange={(e) => setCourseworkIdInput(e.target.value)}
-              className="flex-1 h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-            />
-            <button
-              onClick={() => setCourseworkId(courseworkIdInput.trim())}
-              disabled={!courseworkIdInput.trim()}
-              className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
-            >
-              Load
-            </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+            {isCourseworkLoading ? (
+              <div className="flex-1 h-11 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+            ) : courseworks.length > 0 ? (
+              <select
+                value={courseworkId}
+                onChange={(e) => {
+                  setCourseworkId(e.target.value);
+                  setCourseworkIdInput(e.target.value);
+                }}
+                className="flex-1 h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
+              >
+                <option value="">-- Select Classroom Coursework --</option>
+                {courseworks.map((cw: any) => (
+                  <option key={cw.id} value={cw.id}>
+                    {cw.title}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                placeholder="Enter Coursework / Assignment ID from Google Classroom"
+                value={courseworkIdInput}
+                onChange={(e) => setCourseworkIdInput(e.target.value)}
+                className="flex-1 h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              />
+            )}
+            {(courseworks.length === 0 || !courseworkId) && (
+              <button
+                onClick={() => setCourseworkId(courseworkIdInput.trim())}
+                disabled={!courseworkIdInput.trim()}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                Load
+              </button>
+            )}
           </div>
           {courseworkId && (
             <SubmissionsList
               courseId={selectedCourse.id}
               courseworkId={courseworkId}
-              courseworkName={`Coursework: ${courseworkId}`}
+              courseworkName={
+                courseworks.find((cw: any) => cw.id === courseworkId)?.title 
+                  ? `Coursework: ${courseworks.find((cw: any) => cw.id === courseworkId).title}`
+                  : `Coursework: ${courseworkId}`
+              }
             />
           )}
         </div>

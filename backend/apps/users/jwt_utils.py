@@ -75,10 +75,10 @@ def get_user_from_request(request):
     """
     from apps.users.models import User
     
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    auth_header = request.headers.get("Authorization", "") or request.META.get("HTTP_AUTHORIZATION", "")
     print(f"[AuthDebug] Header: {auth_header[:20]}...")
     
-    if not auth_header.startswith("Bearer "):
+    if not auth_header or not auth_header.startswith("Bearer "):
         print("[AuthDebug] No Bearer token")
         return None
     
@@ -133,8 +133,8 @@ def get_payload_from_request(request):
     Does NOT query the database or Redis.
     Use this when you ONLY need to check the user's ID or Role.
     """
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-    if not auth_header.startswith("Bearer "):
+    auth_header = request.headers.get("Authorization", "") or request.META.get("HTTP_AUTHORIZATION", "")
+    if not auth_header or not auth_header.startswith("Bearer "):
         return None
     token = auth_header[7:]
     try:

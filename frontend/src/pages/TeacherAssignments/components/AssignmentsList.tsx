@@ -5,14 +5,24 @@ import {
   LuEye,
   LuCalendarClock,
   LuClipboardList,
-  LuChevronRight,
   LuX,
   LuUser,
   LuCircleCheck,
   LuCircleAlert,
   LuFileQuestion,
+  LuDownload,
+  LuShare2,
+  LuLoader,
 } from "react-icons/lu";
-import { useAssignments, useDeleteAssignment, useAssignment, useAssignmentSubmissions } from "../../../hooks/useCore";
+import {
+  useAssignments,
+  useDeleteAssignment,
+  useAssignment,
+  useAssignmentSubmissions,
+  useGradeLocalSubmission,
+  usePostClassroomReport,
+  useGenerateClassReport,
+} from "../../../hooks/useCore";
 import { Assignment, AssignmentSubmission } from "../../../services/core.service";
 
 // ── Assignment Detail Modal ────────────────────────────────────────────────────
@@ -22,6 +32,81 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
   const { data: submissionsData, isLoading: loadingSubs } = useAssignmentSubmissions(assignmentId);
   const assignment = assignmentData?.assignment;
   const submissions = submissionsData?.submissions ?? [];
+
+  // Mutations
+  const gradeSubmission = useGradeLocalSubmission();
+  const postClassroomReport = usePostClassroomReport();
+  const generateReport = useGenerateClassReport();
+
+  // Local state
+  const [gradingSubmission, setGradingSubmission] = useState<AssignmentSubmission | null>(null);
+  const [gradeScore, setGradeScore] = useState<number>(0);
+  const [gradeFeedback, setGradeFeedback] = useState<string>("");
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [postingReport, setPostingReport] = useState(false);
+  const [savingGrade, setSavingGrade] = useState(false);
+
+  const startGrading = (sub: AssignmentSubmission) => {
+    setGradingSubmission(sub);
+    setGradeScore(sub.score ?? 0);
+    setGradeFeedback(sub.feedback ?? "");
+  };
+
+  const handleSaveGrade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gradingSubmission) return;
+    try {
+      setSavingGrade(true);
+      await gradeSubmission.mutateAsync({
+        submissionId: gradingSubmission.id,
+        score: gradeScore,
+        feedback: gradeFeedback,
+      });
+      setGradingSubmission(null);
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message || "Failed to update grade");
+    } finally {
+      setSavingGrade(false);
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    try {
+      setGeneratingPdf(true);
+      const res = await generateReport.mutateAsync({ assignmentId });
+      const byteCharacters = atob(res.file_base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: res.mime_type });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message || "Failed to generate report");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handlePostReport = async () => {
+    try {
+      setPostingReport(true);
+      await postClassroomReport.mutateAsync(assignmentId);
+      alert("Performance report has been posted to Google Classroom successfully!");
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message || "Failed to post report to Classroom");
+    } finally {
+      setPostingReport(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -37,7 +122,7 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                 {loadingAssignment ? "Loading..." : assignment?.title}
               </h2>
               <p className="text-xs text-gray-500 dark:text-slate-400">
-                Assignment Details
+                Assignment details and student submissions
               </p>
             </div>
           </div>
@@ -61,17 +146,17 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
               {/* Meta */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Total Marks</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">Total Marks</p>
                   <p className="font-bold text-gray-900 dark:text-white">{assignment.total_marks}</p>
                 </div>
                 <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Deadline</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">Deadline</p>
                   <p className="font-bold text-gray-900 dark:text-white text-sm">
                     {assignment.deadline ? new Date(assignment.deadline).toLocaleDateString() : "—"}
                   </p>
                 </div>
                 <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Created</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">Created</p>
                   <p className="font-bold text-gray-900 dark:text-white text-sm">
                     {new Date(assignment.created_at).toLocaleDateString()}
                   </p>
@@ -96,34 +181,138 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                     Questions ({(assignment as any).questions.length})
                   </h3>
                   <div className="space-y-2">
-                    {(assignment as any).questions.map((q: any, idx: number) => (
-                      <div key={q.id} className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
-                        <div className="flex items-start gap-3">
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center">
-                            {idx + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">{q.text}</p>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-xs text-gray-400 dark:text-slate-500 capitalize">{q.question_type}</span>
-                              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{q.points} pts</span>
+                    {(assignment as any).questions.map((q: any, idx: number) => {
+                      const [questionText, rubric] = (q.text || "").split("\n\nRUBRIC:");
+                      return (
+                        <div key={q.id} className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 space-y-2">
+                          <div className="flex items-start gap-3">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center">
+                              {idx + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-gray-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">{questionText}</p>
+                              <div className="flex items-center gap-3 mt-2">
+                                <span className="text-xs text-gray-400 dark:text-slate-500 capitalize">{q.question_type}</span>
+                                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{q.points} pts</span>
+                              </div>
                             </div>
                           </div>
+                          {rubric && (
+                            <div className="pl-9 text-xs text-gray-500 dark:text-slate-400 bg-amber-50/20 dark:bg-amber-950/10 p-2.5 rounded-lg border border-amber-100/20">
+                              <span className="font-semibold text-amber-600 dark:text-amber-400 mr-1">Rubric:</span>
+                              {rubric.trim()}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
             </>
           ) : null}
 
+          {/* Grading sub-modal / form section */}
+          {gradingSubmission && (
+            <div className="bg-indigo-50/30 dark:bg-slate-800/80 border border-indigo-100 dark:border-slate-700 rounded-xl p-5 space-y-3">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <LuUser className="w-4 h-4 text-indigo-500" />
+                Grading: {gradingSubmission.student_name}
+              </h4>
+              <form onSubmit={handleSaveGrade} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">
+                      Score (out of {assignment?.total_marks ?? 100})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max={assignment?.total_marks ?? 100}
+                      value={gradeScore}
+                      onChange={(e) => setGradeScore(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">
+                      Feedback
+                    </label>
+                    <textarea
+                      value={gradeFeedback}
+                      onChange={(e) => setGradeFeedback(e.target.value)}
+                      placeholder="Add guidance or notes..."
+                      className="w-full px-3.5 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none h-[40px] resize-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setGradingSubmission(null)}
+                    className="px-3.5 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingGrade}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {savingGrade ? (
+                      <LuLoader className="w-3.5 h-3.5 animate-spin" />
+                    ) : null}
+                    Save Grade
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
           {/* Submissions */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-              <LuUser className="w-4 h-4 text-emerald-500" />
-              Student Submissions
-            </h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 flex items-center gap-2">
+                <LuUser className="w-4 h-4 text-emerald-500" />
+                Student Submissions
+              </h3>
+
+              {/* Actions at bottom of submissions */}
+              {!loadingSubs && submissions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadReport}
+                    disabled={generatingPdf}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {generatingPdf ? (
+                      <LuLoader className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <LuDownload className="w-3.5 h-3.5" />
+                    )}
+                    Download Report
+                  </button>
+
+                  {assignment?.course_id && (
+                    <button
+                      onClick={handlePostReport}
+                      disabled={postingReport}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {postingReport ? (
+                        <LuLoader className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <LuShare2 className="w-3.5 h-3.5" />
+                      )}
+                      Post to Classroom
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             {loadingSubs ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
@@ -144,32 +333,52 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                       <th className="px-4 py-3">Score</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Submitted</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                     {submissions.map((s) => (
                       <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{s.student_name}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                          <div>
+                            <p className="font-semibold text-xs">{s.student_name}</p>
+                            {s.feedback && (
+                              <p className="text-[10px] text-gray-400 dark:text-slate-500 italic mt-0.5 line-clamp-1">
+                                Feedback: {s.feedback}
+                              </p>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           {s.score !== null ? (
-                            <span className="font-semibold text-indigo-600 dark:text-indigo-400">{s.score}</span>
+                            <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                              {s.score} / {assignment?.total_marks}
+                            </span>
                           ) : (
                             <span className="text-gray-400 dark:text-slate-500">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
                           {s.is_late ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
                               <LuCircleAlert className="w-3 h-3" /> Late
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
                               <LuCircleCheck className="w-3 h-3" /> On time
                             </span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-400 dark:text-slate-500 text-xs">
                           {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => startGrading(s)}
+                            className="px-2.5 py-1 rounded bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-all"
+                          >
+                            Grade
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -190,7 +399,7 @@ const AssignmentsList: React.FC = () => {
   const { data, isLoading } = useAssignments();
   const deleteAssignment = useDeleteAssignment();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const assignments = data?.assignments ?? [];
+  const assignments = (data?.assignments ?? []) as Assignment[];
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -234,9 +443,11 @@ const AssignmentsList: React.FC = () => {
               <thead className="bg-gray-50 dark:bg-slate-800 text-xs uppercase text-gray-500 dark:text-slate-500 font-semibold">
                 <tr>
                   <th className="px-6 py-4">Assignment</th>
+                  <th className="px-6 py-4">Type</th>
                   <th className="px-6 py-4">Deadline</th>
                   <th className="px-6 py-4">Total Marks</th>
                   <th className="px-6 py-4">Created</th>
+                  <th className="px-6 py-4">AI Graded</th>
                   <th className="px-6 py-4">Actions</th>
                 </tr>
               </thead>
@@ -252,18 +463,23 @@ const AssignmentsList: React.FC = () => {
                         <LuClipboardList className="w-4 h-4 text-indigo-500 flex-shrink-0" />
                         <span className="line-clamp-1">{a.title}</span>
                         {a.course_id && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium">GC</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold">GC</span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-semibold">
+                        Assignment
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       {a.deadline ? (
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                           isUpcomingSoon(a.deadline)
-                            ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
-                            : new Date(a.deadline) < new Date()
-                              ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                              : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400"
+                             ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                             : new Date(a.deadline) < new Date()
+                               ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                               : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400"
                         }`}>
                           {new Date(a.deadline).toLocaleDateString()}
                         </span>
@@ -276,12 +492,27 @@ const AssignmentsList: React.FC = () => {
                       {new Date(a.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">
+                      {a.has_submissions ? (
+                        a.is_graded ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                            Yes
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                            No
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-gray-400 dark:text-slate-500">No Submissions</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedId(a.id); }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 transition-all flex items-center gap-1"
                         >
-                          <LuEye className="w-3 h-3" /> View
+                          <LuEye className="w-3.5 h-3.5" /> View
                         </button>
                         <button
                           onClick={(e) => handleDelete(e, a.id)}

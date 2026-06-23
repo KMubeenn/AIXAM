@@ -74,7 +74,22 @@ export const ChatService = {
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        const trimmed = buffer.trim();
+        if (trimmed) {
+          if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              onStructuredData(parsed);
+            } catch (e) {
+              onToken(trimmed);
+            }
+          } else {
+            onToken(trimmed);
+          }
+        }
+        break;
+      }
 
       const chunk = decoder.decode(value, { stream: true });
       buffer += chunk;
