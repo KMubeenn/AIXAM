@@ -85,29 +85,45 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
           AI Assistant
         </Link>
         <Link
-          to="#"
-          className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
+          to="/chat"
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+            isActive("/chat")
+              ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100"
+          }`}
         >
           <LuCloudUpload className="w-5 h-5" />
           Upload Content
         </Link>
         <Link
-          to="#"
-          className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
+          to="/teacher-assignments"
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+            isActive("/teacher-assignments")
+              ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100"
+          }`}
         >
           <LuWand className="w-5 h-5" />
-          Generate Assignments
+          Assignments
         </Link>
         <Link
-          to="#"
-          className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
+          to="/teacher-quizzes"
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+            isActive("/teacher-quizzes")
+              ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100"
+          }`}
         >
           <LuFileQuestion className="w-5 h-5" />
-          Quizzes
+          Quizzes & Grading
         </Link>
         <Link
-          to="#"
-          className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
+          to="/classroom"
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+            isActive("/classroom")
+              ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100"
+          }`}
         >
           <LuUsers className="w-5 h-5" />
           Classroom Integration
@@ -165,36 +181,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
           </div>
         )}
 
-        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-800">
-          <Link
-            to="#"
-            className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
-          >
-            <LuCloudUpload className="w-5 h-5" />
-            Upload Content
-          </Link>
-          <Link
-            to="#"
-            className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
-          >
-            <LuWand className="w-5 h-5" />
-            Generate Assignments
-          </Link>
-          <Link
-            to="#"
-            className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
-          >
-            <LuFileQuestion className="w-5 h-5" />
-            Quizzes
-          </Link>
-          <Link
-            to="#"
-            className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100 rounded-lg font-medium transition-colors"
-          >
-            <LuUsers className="w-5 h-5" />
-            Classroom Integration
-          </Link>
-        </div>
+
       </nav>
 
       <div className="p-4 border-t border-gray-100 dark:border-slate-800 relative" ref={dropdownRef}>

@@ -102,6 +102,81 @@ export interface Submission {
   submitted_at: string;
 }
 
+// ── Teacher-specific interfaces ──────────────────────────────
+export interface TeacherQuiz {
+  id: string;
+  title: string;
+  question_count: number;
+  created_at: string;
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  student_id: string;
+  student_name: string;
+  score: number | null;
+  feedback: string;
+  is_late: boolean;
+  submitted_at: string;
+}
+
+export interface BatchGradeDetail {
+  student_name: string;
+  question_id: number;
+  marks: number;
+  max_marks: number;
+  feedback: string;
+}
+
+export interface BatchGrade {
+  id: string;
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  score: number | null;
+  feedback: string;
+  is_late: boolean;
+  submitted_at: string;
+  grading_details: BatchGradeDetail[];
+}
+
+export interface ClassReport {
+  filename: string;
+  mime_type: string;
+  file_base64: string;
+}
+
+export interface ClassroomCourse {
+  id: string;
+  name: string;
+  description?: string;
+  section?: string;
+}
+
+export interface ClassroomSubmission {
+  id: string;
+  userId: string;
+  studentName: string;
+  state: 'TURNED_IN' | 'RETURNED' | 'CREATED' | 'RECLAIMED_BY_STUDENT' | string;
+  assignedGrade: number | null;
+  hasAttachments: boolean;
+}
+
+export interface SubmissionContent {
+  submission_id: string;
+  content: string;
+}
+
+export interface PushGradeResult {
+  message: string;
+  result: {
+    submission_id: string;
+    assignedGrade: number;
+    draftGrade: number | null;
+    state: string;
+  };
+}
+
 export interface GradingItem {
   question: string;
   student_answer: string;
@@ -143,10 +218,6 @@ export const CoreService = {
     return response.data;
   },
 
-  async getAssignmentSubmissions(id: string) {
-    const response = await api.get(`/core/assignments/${id}/submissions/`);
-    return response.data;
-  },
 
   // ── Flashcards ───────────────────────────────
   async getFlashcardSets(): Promise<{ flashcard_sets: FlashcardSet[] }> {
@@ -220,6 +291,54 @@ export const CoreService = {
 
   async deleteSubmission(id: string): Promise<{ message: string }> {
     const response = await api.delete(`/core/submissions/${id}/delete/`);
+    return response.data;
+  },
+
+  // ── Teacher: Assignment Submissions ──────────
+  async getAssignmentSubmissions(assignmentId: string): Promise<{ submissions: AssignmentSubmission[] }> {
+    const response = await api.get(`/core/assignments/${assignmentId}/submissions/`);
+    return response.data;
+  },
+
+  // ── Teacher: Quizzes ─────────────────────────
+  async getTeacherQuizzes(): Promise<{ quizzes: TeacherQuiz[] }> {
+    const response = await api.get('/core/teacher/quizzes/');
+    return response.data;
+  },
+
+  // ── Teacher: Batch Grades ────────────────────
+  async getBatchGrades(assignmentId: string): Promise<{ grades: BatchGrade[] }> {
+    const response = await api.get(`/core/assignments/${assignmentId}/grades/`);
+    return response.data;
+  },
+
+  // ── Teacher: Class Report PDF ────────────────
+  async generateClassReport(assignmentId: string, gradesData?: object): Promise<ClassReport> {
+    const response = await api.post(`/core/assignments/${assignmentId}/report/`, gradesData ? { grades_data: gradesData } : {});
+    return response.data;
+  },
+
+  // ── Google Classroom ─────────────────────────
+  async getClassroomCourses(): Promise<{ courses: ClassroomCourse[] }> {
+    const response = await api.get('/core/classroom/courses/');
+    return response.data;
+  },
+
+  async getClassroomSubmissions(courseId: string, courseworkId: string): Promise<{ submissions: ClassroomSubmission[] }> {
+    const response = await api.get(`/core/classroom/courses/${courseId}/coursework/${courseworkId}/submissions/`);
+    return response.data;
+  },
+
+  async fetchSubmissionContent(courseId: string, courseworkId: string, submissionId: string): Promise<SubmissionContent> {
+    const response = await api.get(`/core/classroom/courses/${courseId}/coursework/${courseworkId}/submissions/${submissionId}/content/`);
+    return response.data;
+  },
+
+  async pushGradeToClassroom(courseId: string, courseworkId: string, submissionId: string, assignedGrade: number, draftGrade?: number): Promise<PushGradeResult> {
+    const response = await api.post(
+      `/core/classroom/courses/${courseId}/coursework/${courseworkId}/submissions/${submissionId}/grade/`,
+      { assigned_grade: assignedGrade, ...(draftGrade !== undefined ? { draft_grade: draftGrade } : {}) }
+    );
     return response.data;
   },
 };

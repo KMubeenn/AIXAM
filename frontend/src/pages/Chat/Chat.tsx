@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FiSend, FiPaperclip, FiArrowLeft, FiMoreVertical, FiLayers, FiFileText, FiCheckCircle, FiDownload } from "react-icons/fi";
+import { FiSend, FiPaperclip, FiArrowLeft, FiMoreVertical, FiLayers, FiFileText, FiCheckCircle, FiDownload, FiClipboard } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useChat } from "../../hooks/useChat";
-import Sidebar from "../StudentDashboard/components/Sidebar";
+import StudentSidebar from "../StudentDashboard/components/Sidebar";
+import TeacherSidebar from "../TeacherDashboard/components/Sidebar";
+import { useAuthStore } from "../../store/useAuthStore";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SubmissionDetailModal } from "../StudentDashboard/components/SubmissionsHistory";
@@ -10,6 +12,8 @@ import { SubmissionDetailModal } from "../StudentDashboard/components/Submission
 const Chat: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuthStore();
+  const isTeacher = user?.role === 'teacher';
   const { messages, isStreaming, sendMessage, setMessages, loadSession, setSessionId, sessionId } = useChat();
   const [input, setInput] = useState("");
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
@@ -101,13 +105,20 @@ const Chat: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-slate-950">
-      <Sidebar 
-        onSessionSelect={handleSessionSelect} 
-        onNewChat={handleNewChat} 
-        onSessionDelete={handleSessionDelete}
-        activeSessionId={sessionId}
-        loadingSessionId={loadingSessionId}
-      />
+      {isTeacher ? (
+        <TeacherSidebar
+          onSessionSelect={handleSessionSelect}
+          onNewChat={handleNewChat}
+        />
+      ) : (
+        <StudentSidebar
+          onSessionSelect={handleSessionSelect}
+          onNewChat={handleNewChat}
+          onSessionDelete={handleSessionDelete}
+          activeSessionId={sessionId}
+          loadingSessionId={loadingSessionId}
+        />
+      )}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Chat Header */}
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-6 sticky top-0 z-10">
@@ -145,9 +156,13 @@ const Chat: React.FC = () => {
               <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4">
                 <FiSend className="w-10 h-10 rotate-12" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Start a New Study Session</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                {isTeacher ? 'Start a New Teaching Session' : 'Start a New Study Session'}
+              </h3>
               <p className="max-w-xs text-gray-500 dark:text-slate-400">
-                Ask me to explain concepts, generate flashcards, or create mock tests from your materials.
+                {isTeacher
+                  ? 'Ask me to generate assignments, quizzes, or grade student submissions.'
+                  : 'Ask me to explain concepts, generate flashcards, or create mock tests from your materials.'}
               </p>
             </div>
           ) : (
@@ -261,6 +276,28 @@ const Chat: React.FC = () => {
                                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-lg hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 transition-all shadow-sm"
                               >
                                 Start Test
+                              </button>
+                            </div>
+                          )}
+
+                          {output.type === 'assignment' && output.data && (
+                            <div className="p-4 bg-violet-50 dark:bg-violet-900/30 border border-violet-100 dark:border-violet-800 rounded-xl flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-violet-600 flex items-center justify-center text-white">
+                                  <FiClipboard className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Assignment Created</span>
+                                  <div className="text-sm text-gray-600 dark:text-slate-300">
+                                    {Array.isArray(output.data) ? `${output.data.length} questions` : output.data.title || 'Ready to view'}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => navigate('/teacher-assignments')}
+                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
+                              >
+                                View Assignment
                               </button>
                             </div>
                           )}
@@ -422,6 +459,26 @@ const Chat: React.FC = () => {
                                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-lg hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 transition-all shadow-sm"
                               >
                                 Start Test
+                              </button>
+                            </div>
+                          )}
+
+                          {item.type === 'assignment' && (
+                            <div className="p-4 bg-violet-50 dark:bg-violet-900/30 border border-violet-100 dark:border-violet-800 rounded-xl flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-violet-600 flex items-center justify-center text-white">
+                                  <FiClipboard className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Assignment Created</span>
+                                  <div className="text-sm text-gray-600 dark:text-slate-300">{item.text_summary || 'Ready to view'}</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => navigate('/teacher-assignments')}
+                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
+                              >
+                                View Assignment
                               </button>
                             </div>
                           )}

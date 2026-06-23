@@ -149,3 +149,83 @@ export const useDeleteSubmission = () => {
     },
   });
 };
+
+// ── Teacher: Assignment Submissions ──────────────────────────────────────────
+
+export const useAssignmentSubmissions = (assignmentId: string | null) => {
+  return useQuery({
+    queryKey: ['assignment-submissions', assignmentId],
+    queryFn: () => CoreService.getAssignmentSubmissions(assignmentId!),
+    enabled: !!assignmentId,
+  });
+};
+
+// ── Teacher: Quizzes ─────────────────────────────────────────────────────────
+
+export const useTeacherQuizzes = () => {
+  return useQuery({
+    queryKey: ['teacher-quizzes'],
+    queryFn: () => CoreService.getTeacherQuizzes(),
+  });
+};
+
+// ── Teacher: Batch Grades ─────────────────────────────────────────────────────
+
+export const useBatchGrades = (assignmentId: string | null) => {
+  return useQuery({
+    queryKey: ['batch-grades', assignmentId],
+    queryFn: () => CoreService.getBatchGrades(assignmentId!),
+    enabled: !!assignmentId,
+  });
+};
+
+// ── Teacher: Class Report PDF ─────────────────────────────────────────────────
+
+export const useGenerateClassReport = () => {
+  return useMutation({
+    mutationFn: ({ assignmentId, gradesData }: { assignmentId: string; gradesData?: object }) =>
+      CoreService.generateClassReport(assignmentId, gradesData),
+  });
+};
+
+// ── Google Classroom ──────────────────────────────────────────────────────────
+
+export const useClassroomCourses = () => {
+  return useQuery({
+    queryKey: ['classroom-courses'],
+    queryFn: () => CoreService.getClassroomCourses(),
+    retry: false,
+  });
+};
+
+export const useClassroomSubmissions = (courseId: string | null, courseworkId: string | null) => {
+  return useQuery({
+    queryKey: ['classroom-submissions', courseId, courseworkId],
+    queryFn: () => CoreService.getClassroomSubmissions(courseId!, courseworkId!),
+    enabled: !!courseId && !!courseworkId,
+  });
+};
+
+export const useFetchSubmissionContent = () => {
+  return useMutation({
+    mutationFn: ({
+      courseId, courseworkId, submissionId,
+    }: { courseId: string; courseworkId: string; submissionId: string }) =>
+      CoreService.fetchSubmissionContent(courseId, courseworkId, submissionId),
+  });
+};
+
+export const usePushGrade = () => {
+  return useMutation({
+    mutationFn: ({
+      courseId, courseworkId, submissionId, assignedGrade, draftGrade,
+    }: {
+      courseId: string;
+      courseworkId: string;
+      submissionId: string;
+      assignedGrade: number;
+      draftGrade?: number;
+    }) =>
+      CoreService.pushGradeToClassroom(courseId, courseworkId, submissionId, assignedGrade, draftGrade),
+  });
+};

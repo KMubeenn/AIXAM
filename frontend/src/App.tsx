@@ -7,6 +7,9 @@ import Chat from "./pages/Chat/Chat";
 import FlashcardsPage from "./pages/Flashcards/FlashcardsPage";
 import MockTestsPage from "./pages/MockTests/MockTestsPage";
 import StudyMaterialsPage from "./pages/StudyMaterials/StudyMaterialsPage";
+import TeacherAssignments from "./pages/TeacherAssignments/TeacherAssignments";
+import TeacherQuizzes from "./pages/TeacherQuizzes/TeacherQuizzes";
+import Classroom from "./pages/Classroom/Classroom";
 
 import AuthLayout from "./layouts/AuthLayout";
 
@@ -29,6 +32,10 @@ const App: React.FC = () => {
         <Route path="/flashcards" element={<FlashcardsPage />} />
         <Route path="/mock-tests" element={<MockTestsPage />} />
         <Route path="/study-materials" element={<StudyMaterialsPage />} />
+        {/* Teacher Pages */}
+        <Route path="/teacher-assignments" element={<TeacherAssignments />} />
+        <Route path="/teacher-quizzes" element={<TeacherQuizzes />} />
+        <Route path="/classroom" element={<Classroom />} />
 
         {/* Auth Routes */}
 
