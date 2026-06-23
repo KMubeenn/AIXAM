@@ -148,12 +148,12 @@ const StatsCards: React.FC = () => {
       </div>
 
       {/* Topic Performance Breakdown */}
-      {analytics && analytics.topic_performance && analytics.topic_performance.length > 0 && (
+      {analytics && analytics.topics && analytics.topics.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
           <h3 className="font-bold text-gray-900 dark:text-white mb-4">Topic Performance Breakdown</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {analytics.topic_performance.map((tp: any, index: number) => {
-              const scorePercent = Math.round(tp.average_score);
+            {analytics.topics.map((tp: any, index: number) => {
+              const scorePercent = Math.round(tp.avg_score);
               return (
                 <div key={index} className="flex flex-col gap-2 p-4 bg-gray-50 dark:bg-slate-800/40 rounded-lg border border-gray-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
@@ -174,7 +174,7 @@ const StatsCards: React.FC = () => {
                       style={{ width: `${scorePercent}%` }}
                     />
                   </div>
-                  <span className="text-xs text-gray-400 dark:text-slate-500">{tp.submission_count} submissions</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">{tp.student_count} submissions</span>
                 </div>
               );
             })}

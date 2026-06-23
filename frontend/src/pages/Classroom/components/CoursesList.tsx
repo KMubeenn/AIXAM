@@ -428,7 +428,7 @@ const CoursesList: React.FC = () => {
               courseworkId={courseworkId}
               courseworkName={
                 courseworks.find((cw: any) => cw.id === courseworkId)?.title 
-                  ? `Coursework: ${courseworks.find((cw: any) => cw.id === courseworkId).title}`
+                  ? `Coursework: ${courseworks.find((cw: any) => cw.id === courseworkId)?.title}`
                   : `Coursework: ${courseworkId}`
               }
             />
