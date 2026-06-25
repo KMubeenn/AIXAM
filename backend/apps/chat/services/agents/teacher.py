@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from pathlib import Path
 from typing import TypedDict, Literal
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -12,6 +13,7 @@ from apps.chat.services.agents.agent_state import BaseState, Document
 from apps.chat.services.services.TeacherTools import TeacherTools, VALID_TEACHER_TASKS
 from apps.chat.services.utilities.DocWriter import DocumentWriter
 from apps.chat.services.services.History import History
+from apps.chat.services.utilities.LLMRouter import invoke_with_fallback
 
 
 class AssignmentQuestion(TypedDict, total=False):
@@ -79,19 +81,34 @@ class TeacherAgent:
 
     def __init__(self, temperature: float = 0.7):
         self.temperature = temperature
+        # Build the primary (Gemini) LLM for conversational tool-calling node.
+        # Structured LLMs are rebuilt on-demand through LLMRouter.
         base_llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
             google_api_key=os.getenv("GEMINI_API_KEY"),
             temperature=self.temperature
         )
         self.llm = base_llm.bind_tools(TeacherTools.return_tools())
-        
-        self.assignment_llm = base_llm.with_structured_output(GeneratedAssignment)
-        self.teacher_quiz_llm = base_llm.with_structured_output(TeacherQuizSet)
-        self.slide_outline_llm = base_llm.with_structured_output(SlideOutline)
-        self.grading_llm = base_llm.with_structured_output(BatchGradingResult)
-        self.doc_llm = base_llm
         self.memory = History()
+
+    # ── LLM builder lambdas ────────────────────────────────────────────────────
+    # Each returns a function that, given a base_llm, produces the bound LLM.
+    # This allows LLMRouter to rebuild the LLM after a model switch.
+
+    def _tools_builder(self):
+        return lambda base: base.bind_tools(TeacherTools.return_tools())
+
+    def _assignment_builder(self):
+        return lambda base: base.with_structured_output(GeneratedAssignment)
+
+    def _quiz_builder(self):
+        return lambda base: base.with_structured_output(TeacherQuizSet)
+
+    def _slide_builder(self):
+        return lambda base: base.with_structured_output(SlideOutline)
+
+    def _grading_builder(self):
+        return lambda base: base.with_structured_output(BatchGradingResult)
 
     @staticmethod
     def load_task_prompt(filename: str):
@@ -117,22 +134,14 @@ class TeacherAgent:
         print(f"[DEBUG TeacherAgent] llm_call node entered. Messages count: {len(state.get('messages', []))}")
         messages = [state['system_prompt']]
         if state.get('files_input'):
-             messages.append(SystemMessage(content=f"Available Reference Material:\n{state.get('files_input')}"))
+            messages.append(SystemMessage(content=f"Available Reference Material:\n{state.get('files_input')}"))
         messages.extend(state['messages'])
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = self.llm.invoke(messages)
-                break
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    print(f"[TeacherAgent] LLM call failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
-                    continue
-                else:
-                    print(f"[TeacherAgent] LLM call failed after {max_retries} attempts: {e}")
-                    raise
-        
+
+        response = invoke_with_fallback(
+            build_llm_fn=self._tools_builder(),
+            messages=messages,
+            temperature=self.temperature,
+        )
         return {"messages": [response]}
 
     def should_use_tool(self, state: TeacherState):
@@ -150,43 +159,64 @@ class TeacherAgent:
         messages = [state['system_prompt'], task_prompt]
         if grading_instructions:
             messages.append(SystemMessage(content=f"Additional grading rubrics/instructions:\n{grading_instructions}"))
-        
+
         user_message = next(
             (msg for msg in reversed(state['messages']) if isinstance(msg, HumanMessage)),
             None
         )
         if user_message:
             messages.append(user_message)
-            
+
         messages.append(HumanMessage(content=f"Assignment & Submissions Details to grade:\n{json.dumps(submissions)}"))
-        
-        result = self.grading_llm.invoke(messages)
+
+        result = invoke_with_fallback(
+            build_llm_fn=self._grading_builder(),
+            messages=messages,
+            temperature=self.temperature,
+        )
         current_calls = state.get('llm_calls', 0)
         return {"batch_grades": result, "llm_calls": current_calls + 1}
 
-    # Task generators
+    # ── Task generators (all use LLMRouter for automatic fallback) ───────────────
+
     def _generate_assignment(self, state: TeacherState):
         task_prompt = TeacherAgent.load_task_prompt('assignment_prompt.md')
         messages = self._build_task_messages(state, task_prompt)
-        result = self.assignment_llm.invoke(messages)
+        result = invoke_with_fallback(
+            build_llm_fn=self._assignment_builder(),
+            messages=messages,
+            temperature=self.temperature,
+        )
         return {"assignment": result}
 
     def _generate_teacher_quiz(self, state: TeacherState):
         task_prompt = TeacherAgent.load_task_prompt('teacher_quiz_prompt.md')
         messages = self._build_task_messages(state, task_prompt)
-        result = self.teacher_quiz_llm.invoke(messages)
+        result = invoke_with_fallback(
+            build_llm_fn=self._quiz_builder(),
+            messages=messages,
+            temperature=self.temperature,
+        )
         return {"teacher_quiz": result['questions']}
 
     def _generate_slide_outline(self, state: TeacherState):
         task_prompt = TeacherAgent.load_task_prompt('slide_outline_prompt.md')
         messages = self._build_task_messages(state, task_prompt)
-        result = self.slide_outline_llm.invoke(messages)
+        result = invoke_with_fallback(
+            build_llm_fn=self._slide_builder(),
+            messages=messages,
+            temperature=self.temperature,
+        )
         return {"slide_outline": result}
 
     def _generate_document(self, state: TeacherState, format_type: str):
         task_prompt = TeacherAgent.load_task_prompt('teacher_document_prompt.md')
         messages = self._build_task_messages(state, task_prompt)
-        result = self.doc_llm.invoke(messages)
+        result = invoke_with_fallback(
+            build_llm_fn=lambda base: base,   # plain invoke, no structured output
+            messages=messages,
+            temperature=self.temperature,
+        )
         content = result.content
         title = "Teacher_Document"
         doc_writer = DocumentWriter()
@@ -232,72 +262,68 @@ class TeacherAgent:
         print("[DEBUG TeacherAgent] orchestrator node entered.")
         llm_calls = state.get('llm_calls', 0)
 
-        # Walk back through messages to find the last AIMessage with tool_calls
-        from langchain.messages import AIMessage
-        last_ai_message = None
-        for msg in reversed(state['messages']):
-            if isinstance(msg, AIMessage) and getattr(msg, 'tool_calls', None):
-                last_ai_message = msg
-                break
+        try:
+            from langchain.messages import AIMessage
+            last_ai_message = None
+            for msg in reversed(state['messages']):
+                if isinstance(msg, AIMessage) and getattr(msg, 'tool_calls', None):
+                    last_ai_message = msg
+                    break
 
-        if not last_ai_message:
-            return {"llm_calls": llm_calls}
+            if not last_ai_message:
+                return {"llm_calls": llm_calls}
 
-        tool_call = last_ai_message.tool_calls[0]
-        if tool_call['name'] != "plan_tasks":
-            return {"llm_calls": llm_calls}
-            
-        steps = tool_call['args'].get('steps', [])
-        step_outputs = {}
-        final_state = {}
-        
-        for step in steps:
-            task = step['task']
-            depends_on = step.get('depends_on')
-            
-            # Document generation/export
-            if task in ['generate_pdf', 'generate_docx', 'generate_pptx']:
-                doc_format = task.replace('generate_', '')
-                if depends_on and depends_on in step_outputs:
-                    # Exporting previously structured data
-                    output = self._export_as_document(step_outputs[depends_on], doc_format, state)
-                    if output:
+            tool_call = last_ai_message.tool_calls[0]
+            if tool_call['name'] != "plan_tasks":
+                return {"llm_calls": llm_calls}
+
+            steps = tool_call['args'].get('steps', [])
+            step_outputs = {}
+            final_state = {}
+
+            for step in steps:
+                task = step['task']
+                depends_on = step.get('depends_on')
+
+                if task in ['generate_pdf', 'generate_docx', 'generate_pptx']:
+                    doc_format = task.replace('generate_', '')
+                    if depends_on and depends_on in step_outputs:
+                        output = self._export_as_document(step_outputs[depends_on], doc_format, state)
+                        if output:
+                            final_state.update(output)
+                            step_outputs[step['step']] = output['document']
+                    else:
+                        output = self._generate_document(state, doc_format)
                         final_state.update(output)
                         step_outputs[step['step']] = output['document']
-                else:
-                    # Generating freestanding document
-                    output = self._generate_document(state, doc_format)
+                        llm_calls += 1
+
+                elif task == 'assignment':
+                    output = self._generate_assignment(state)
                     final_state.update(output)
-                    step_outputs[step['step']] = output['document']
+                    step_outputs[step['step']] = {"title": output['assignment'].get('title'), "questions": output['assignment'].get('questions', [])}
                     llm_calls += 1
-            
-            # Assignment
-            elif task == 'assignment':
-                output = self._generate_assignment(state)
-                final_state.update(output)
-                step_outputs[step['step']] = {"title": output['assignment'].get('title'), "questions": output['assignment'].get('questions', [])}
-                llm_calls += 1
-                
-            # Teacher Quiz
-            elif task == 'teacher_quiz':
-                output = self._generate_teacher_quiz(state)
-                final_state.update(output)
-                step_outputs[step['step']] = {"title": "Teacher Quiz", "questions": output['teacher_quiz']}
-                llm_calls += 1
-                
-            # Slide Outline
-            elif task == 'slide_outline':
-                output = self._generate_slide_outline(state)
-                final_state.update(output)
-                step_outputs[step['step']] = {"title": output['slide_outline'].get('presentation_title'), "slides": output['slide_outline'].get('slides', [])}
-                llm_calls += 1
-                
-        final_state['llm_calls'] = llm_calls
-        # Cleanup any unneeded conversational artifacts if tasks were planned
-        if 'messages' in final_state:
-            del final_state['messages']
-            
-        return final_state
+
+                elif task == 'teacher_quiz':
+                    output = self._generate_teacher_quiz(state)
+                    final_state.update(output)
+                    step_outputs[step['step']] = {"title": "Teacher Quiz", "questions": output['teacher_quiz']}
+                    llm_calls += 1
+
+                elif task == 'slide_outline':
+                    output = self._generate_slide_outline(state)
+                    final_state.update(output)
+                    step_outputs[step['step']] = {"title": output['slide_outline'].get('presentation_title'), "slides": output['slide_outline'].get('slides', [])}
+                    llm_calls += 1
+
+            final_state['llm_calls'] = llm_calls
+            if 'messages' in final_state:
+                del final_state['messages']
+            return final_state
+
+        except Exception as e:
+            print(f"[TeacherAgent] ❌ Orchestrator error: {e}")
+            return {"llm_calls": llm_calls}
 
     def after_tool_router(self, state: TeacherState):
         """After a tool runs, route plan_tasks to orchestrator and everything else back to llm_call."""

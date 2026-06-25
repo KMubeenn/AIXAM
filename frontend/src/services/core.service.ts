@@ -368,6 +368,11 @@ export const CoreService = {
     return res.data;
   },
 
+  async postAssignmentToClassroom(assignmentId: string, courseIds: string[]): Promise<{ message: string; results: any[]; errors: any[] }> {
+    const res = await api.post(`/core/assignments/${assignmentId}/post-to-classroom/`, { course_ids: courseIds });
+    return res.data;
+  },
+
   // ── Teacher: Analytics ───────────────────────
   async getTeacherAnalytics(): Promise<{
     assignment_count: number;

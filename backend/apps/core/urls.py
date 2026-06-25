@@ -19,6 +19,7 @@ from apps.core.views import (
     fetch_submission_content_view, patch_grade_view, list_google_coursework_view,
     # Teacher — Batch Grades & Report
     get_batch_grades_view, generate_class_report_view, grade_submission_view, post_report_to_classroom_view,
+    post_assignment_to_classroom_view,
     # Teacher — Analytics
     get_teacher_analytics_view,
 )
@@ -55,6 +56,7 @@ urlpatterns = [
     path('assignments/<uuid:assignment_id>/grades/', get_batch_grades_view, name='batch_grades'),
     path('assignments/<uuid:assignment_id>/report/', generate_class_report_view, name='class_report'),
     path('assignments/<uuid:assignment_id>/post-report/', post_report_to_classroom_view, name='post_classroom_report'),
+    path('assignments/<uuid:assignment_id>/post-to-classroom/', post_assignment_to_classroom_view, name='post_assignment_to_classroom'),
     path('submissions/<uuid:submission_id>/grade/', grade_submission_view, name='grade_submission'),
 
     # ── Teacher: Quizzes ───────────────────────────────────────────────────

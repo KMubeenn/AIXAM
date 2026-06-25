@@ -9,6 +9,7 @@ from pathlib import Path
 from apps.chat.services.services.History import History
 from apps.chat.services.services.StudentTools import StudentTools
 from apps.chat.services.utilities.DocWriter import DocumentWriter
+from apps.chat.services.utilities.LLMRouter import invoke_with_fallback
 from langchain.messages import HumanMessage, AIMessageChunk
 from langgraph.graph import StateGraph,START,END
 from langchain.chat_models import init_chat_model
@@ -74,13 +75,15 @@ class StudentAgent():
             temperature=self.temperature
         )
         self.llm=base_llm.bind_tools(StudentTools.return_tools())
-        self.flashcard_llm=base_llm.with_structured_output(FlashCardSet)
-        self.mock_test_llm=base_llm.with_structured_output(MockTestSet)
-        self.mcq_llm=base_llm.with_structured_output(McqTestSet)
-        self.grading_llm=base_llm.with_structured_output(GradingResult)
-        self.doc_llm=base_llm
         self.doc_writer=DocumentWriter()
         self.memory=History()
+
+    # ── LLM builder lambdas (used by LLMRouter) ───────────────────────────────
+    def _tools_builder(self):      return lambda base: base.bind_tools(StudentTools.return_tools())
+    def _flashcard_builder(self):  return lambda base: base.with_structured_output(FlashCardSet)
+    def _mocktest_builder(self):   return lambda base: base.with_structured_output(MockTestSet)
+    def _mcq_builder(self):        return lambda base: base.with_structured_output(McqTestSet)
+    def _grading_builder(self):    return lambda base: base.with_structured_output(GradingResult)
 
     @staticmethod
     def load_task_prompt(filename:str)->SystemMessage:
@@ -97,20 +100,12 @@ class StudentAgent():
         if state.get('files_input'):
             file_context=SystemMessage(content=f"You have direct access to the contents of the user's uploaded document. You MUST read, reference, and summarize this text as requested. Do NOT state that you cannot open or read files, as the text has already been parsed and is provided to you below:\n\n{state['files_input']}")
             messages.insert(1,file_context)
-        
-        max_retries=3
-        for attempt in range(max_retries):
-            try:
-                response=self.llm.invoke(messages)
-                break
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    print(f"[StudentAgent] LLM call failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
-                    continue
-                else:
-                    print(f"[StudentAgent] LLM call failed after {max_retries} attempts: {e}")
-                    raise
-        
+
+        response = invoke_with_fallback(
+            build_llm_fn=self._tools_builder(),
+            messages=messages,
+            temperature=self.temperature,
+        )
         current_calls=state.get('llm_calls',0)
         return {"messages":response,"llm_calls":current_calls+1}
 
@@ -122,38 +117,42 @@ class StudentAgent():
         results={}
         total_llm_calls=0
 
-        for step in plan:
-            task=step['task']
-            dep=step.get('depends_on')
-            source_data=step_outputs.get(dep)
+        try:
+            for step in plan:
+                task=step['task']
+                dep=step.get('depends_on')
+                source_data=step_outputs.get(dep)
 
-            if task=='flashcards':
-                output=self._generate_flashcards(state)
-                step_outputs[step['step']]=output['flashcards']
-                results.update(output)
-                total_llm_calls+=1
-
-            elif task=='mock_test':
-                output=self._generate_mock_test(state)
-                step_outputs[step['step']]=output['mock_test']
-                results.update(output)
-                total_llm_calls+=1
-
-            elif task=='mcq_mock_test':
-                output=self._generate_mcq_mock_test(state)
-                step_outputs[step['step']]=output['mcq_test']
-                results.update(output)
-                total_llm_calls+=1
-
-            elif task in ('generate_pdf','generate_docx','generate_pptx'):
-                doc_format=task.replace('generate_','')
-                if source_data:
-                    output=self._export_as_document(source_data,doc_format,state)
-                else:
-                    output=self._generate_document(state,doc_format)
+                if task=='flashcards':
+                    output=self._generate_flashcards(state)
+                    step_outputs[step['step']]=output['flashcards']
+                    results.update(output)
                     total_llm_calls+=1
-                step_outputs[step['step']]=output['document']
-                results.update(output)
+
+                elif task=='mock_test':
+                    output=self._generate_mock_test(state)
+                    step_outputs[step['step']]=output['mock_test']
+                    results.update(output)
+                    total_llm_calls+=1
+
+                elif task=='mcq_mock_test':
+                    output=self._generate_mcq_mock_test(state)
+                    step_outputs[step['step']]=output['mcq_test']
+                    results.update(output)
+                    total_llm_calls+=1
+
+                elif task in ('generate_pdf','generate_docx','generate_pptx'):
+                    doc_format=task.replace('generate_','')
+                    if source_data:
+                        output=self._export_as_document(source_data,doc_format,state)
+                    else:
+                        output=self._generate_document(state,doc_format)
+                        total_llm_calls+=1
+                    step_outputs[step['step']]=output['document']
+                    results.update(output)
+
+        except Exception as e:
+            print(f"[StudentAgent] ❌ Orchestrator error: {e}")
 
         current_calls=state.get('llm_calls',0)
         results['llm_calls']=current_calls+total_llm_calls
@@ -164,12 +163,15 @@ class StudentAgent():
         submission=state['test_submission']
         submission_text=HumanMessage(content=json.dumps(submission))
         messages=[state['system_prompt'],task_prompt]
-        # Inject optional custom grading instructions if the frontend provides them
         grading_instructions=state.get('grading_instructions')
         if grading_instructions:
             messages.append(SystemMessage(content=f"Additional grading instructions from the student:\n{grading_instructions}"))
         messages.append(submission_text)
-        result=self.grading_llm.invoke(messages)
+        result = invoke_with_fallback(
+            build_llm_fn=self._grading_builder(),
+            messages=messages,
+            temperature=self.temperature,
+        )
         current_calls=state.get('llm_calls',0)
         return {"mock_test_grades":result,"llm_calls":current_calls+1}
 
@@ -208,25 +210,25 @@ class StudentAgent():
     def _generate_flashcards(self,state:StudentState):
         task_prompt=StudentAgent.load_task_prompt('flashcard_prompt.md')
         messages=self._build_task_messages(state,task_prompt)
-        result=self.flashcard_llm.invoke(messages)
+        result = invoke_with_fallback(self._flashcard_builder(), messages, self.temperature)
         return {"flashcards":result['cards']}
 
     def _generate_mock_test(self,state:StudentState):
         task_prompt=StudentAgent.load_task_prompt('mock_test_prompt.md')
         messages=self._build_task_messages(state,task_prompt)
-        result=self.mock_test_llm.invoke(messages)
+        result = invoke_with_fallback(self._mocktest_builder(), messages, self.temperature)
         return {"mock_test":result['questions']}
 
     def _generate_mcq_mock_test(self,state:StudentState):
         task_prompt=StudentAgent.load_task_prompt('mcq_test_prompt.md')
         messages=self._build_task_messages(state,task_prompt)
-        result=self.mcq_llm.invoke(messages)
+        result = invoke_with_fallback(self._mcq_builder(), messages, self.temperature)
         return {"mcq_test":result['questions']}
 
     def _generate_document(self,state:StudentState,doc_format:str):
         task_prompt=StudentAgent.load_task_prompt('document_prompt.md')
         messages=self._build_task_messages(state,task_prompt)
-        result=self.doc_llm.invoke(messages)
+        result = invoke_with_fallback(lambda base: base, messages, self.temperature)
         content=result.content
         title=content.split('\n')[0].strip().lstrip('# ') if content else 'Document'
         doc_result=self.doc_writer.write(title=title,content=content,format=doc_format)

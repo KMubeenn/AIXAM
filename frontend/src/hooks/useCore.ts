@@ -269,6 +269,17 @@ export const usePostClassroomReport = () => {
   });
 };
 
+export const usePostAssignmentToClassroom = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ assignmentId, courseIds }: { assignmentId: string; courseIds: string[] }) =>
+      CoreService.postAssignmentToClassroom(assignmentId, courseIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    },
+  });
+};
+
 export const useTeacherAnalytics = () => {
   return useQuery({
     queryKey: ['teacher-analytics'],

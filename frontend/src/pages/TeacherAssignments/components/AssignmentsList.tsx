@@ -12,7 +12,10 @@ import {
   LuFileQuestion,
   LuDownload,
   LuShare2,
-  LuLoader,
+  LuUploadCloud,
+  LuCheckSquare,
+  LuSquare,
+  LuBookOpen,
 } from "react-icons/lu";
 import {
   useAssignments,
@@ -22,6 +25,8 @@ import {
   useGradeLocalSubmission,
   usePostClassroomReport,
   useGenerateClassReport,
+  usePostAssignmentToClassroom,
+  useClassroomCourses,
 } from "../../../hooks/useCore";
 import { Assignment, AssignmentSubmission } from "../../../services/core.service";
 
@@ -393,12 +398,102 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
   );
 };
 
+// ── Post to Classroom Modal ────────────────────────────────────────────────────
+
+const PostToClassroomModal: React.FC<{ assignmentId: string; onClose: () => void }> = ({ assignmentId, onClose }) => {
+  const { data, isLoading } = useClassroomCourses();
+  const postMutation = usePostAssignmentToClassroom();
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const courses = data?.courses ?? [];
+
+  const toggleCourse = (id: string) => {
+    setSelectedCourses(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
+  const handlePost = async () => {
+    if (selectedCourses.length === 0) return;
+    try {
+      await postMutation.mutateAsync({ assignmentId, courseIds: selectedCourses });
+      alert("Successfully posted assignment to selected classrooms!");
+      onClose();
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message || "Failed to post to classroom");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-slate-700 p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <LuUploadCloud className="w-5 h-5 text-indigo-500" />
+            Post to Classroom
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
+            <LuX className="w-5 h-5" />
+          </button>
+        </div>
+        
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1,2,3].map(i => <div key={i} className="h-12 bg-gray-100 dark:bg-slate-800 animate-pulse rounded-xl" />)}
+          </div>
+        ) : courses.length === 0 ? (
+          <p className="text-gray-500 dark:text-slate-400 text-sm text-center py-4">No Google Classroom courses found.</p>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+            {courses.map(course => (
+              <div 
+                key={course.id} 
+                onClick={() => toggleCourse(course.id)}
+                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  selectedCourses.includes(course.id) 
+                    ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20" 
+                    : "border-gray-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700"
+                }`}
+              >
+                {selectedCourses.includes(course.id) ? (
+                  <LuCheckSquare className="w-5 h-5 text-indigo-500" />
+                ) : (
+                  <LuSquare className="w-5 h-5 text-gray-400" />
+                )}
+                <div>
+                  <p className="font-semibold text-sm text-gray-900 dark:text-white line-clamp-1">{course.name}</p>
+                  {course.description && <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">{course.description}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+            Cancel
+          </button>
+          <button 
+            onClick={handlePost}
+            disabled={selectedCourses.length === 0 || postMutation.isPending}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
+          >
+            {postMutation.isPending && <LuLoader className="w-4 h-4 animate-spin" />}
+            Post ({selectedCourses.length})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 // ── Assignments List ───────────────────────────────────────────────────────────
 
 const AssignmentsList: React.FC = () => {
   const { data, isLoading } = useAssignments();
   const deleteAssignment = useDeleteAssignment();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [postModalAssignmentId, setPostModalAssignmentId] = useState<string | null>(null);
   const assignments = (data?.assignments ?? []) as Assignment[];
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -418,6 +513,9 @@ const AssignmentsList: React.FC = () => {
     <>
       {selectedId && (
         <AssignmentDetailModal assignmentId={selectedId} onClose={() => setSelectedId(null)} />
+      )}
+      {postModalAssignmentId && (
+        <PostToClassroomModal assignmentId={postModalAssignmentId} onClose={() => setPostModalAssignmentId(null)} />
       )}
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
@@ -508,6 +606,13 @@ const AssignmentsList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setPostModalAssignmentId(a.id); }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-600 hover:text-white dark:hover:bg-green-600 transition-all flex items-center gap-1 opacity-0 group-hover:opacity-100"
+                          title="Post to Google Classroom"
+                        >
+                          <LuUploadCloud className="w-3.5 h-3.5" /> Post
+                        </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedId(a.id); }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 transition-all flex items-center gap-1"

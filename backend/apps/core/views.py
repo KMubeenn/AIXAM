@@ -693,3 +693,79 @@ async def post_report_to_classroom_view(request, assignment_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+
+# ──────────────────────────────────────────────
+# POST ASSIGNMENT TO CLASSROOM
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def post_assignment_to_classroom_view(request, assignment_id):
+    """
+    Post a saved AIXAM assignment to one or more Google Classroom courses.
+
+    Body:
+        {
+            "course_ids": ["course_id_1", "course_id_2", ...]   // required
+        }
+
+    For each course_id, creates a new Classroom coursework (assignment) using
+    the assignment's title, description, and total_marks as maxPoints.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        body = json.loads(request.body) if request.body else {}
+        course_ids = body.get('course_ids', [])
+        if not course_ids:
+            return JsonResponse({'error': 'course_ids is required and must be a non-empty list'}, status=400)
+
+        from apps.core.models import Assignment
+        try:
+            assignment = await sync_to_async(Assignment.objects.get)(id=assignment_id)
+        except Assignment.DoesNotExist:
+            return JsonResponse({'error': 'Assignment not found'}, status=404)
+
+        if assignment.created_by_id != user.id:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        # Build description from assignment questions if available
+        from apps.core.models import Question
+        questions = await sync_to_async(
+            lambda: list(Question.objects.filter(assignment=assignment).order_by('id'))
+        )()
+
+        description = assignment.description or f"Assignment: {assignment.title}"
+        if questions:
+            description += "\n\nQuestions:\n"
+            for idx, q in enumerate(questions, 1):
+                description += f"Q{idx}. {q.text or q.question if hasattr(q, 'question') else ''}\n"
+                if hasattr(q, 'points') and q.points:
+                    description += f"   [{q.points} marks]\n"
+
+        from apps.chat.services.utilities.ClassroomService import ClassroomService
+
+        results = []
+        errors = []
+        for course_id in course_ids:
+            try:
+                result = await sync_to_async(ClassroomService.post_assignment)(
+                    user,
+                    course_id,
+                    assignment.title,
+                    description,
+                    float(assignment.total_marks or 100)
+                )
+                results.append({'course_id': course_id, 'coursework_id': result.get('id'), 'status': 'success'})
+            except Exception as e:
+                errors.append({'course_id': course_id, 'error': str(e)})
+
+        return JsonResponse({
+            'message': f'Posted to {len(results)} classroom(s).',
+            'results': results,
+            'errors': errors,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
