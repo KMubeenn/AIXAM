@@ -12,10 +12,9 @@ import {
   LuFileQuestion,
   LuDownload,
   LuShare2,
-  LuUploadCloud,
-  LuCheckSquare,
-  LuSquare,
-  LuBookOpen,
+  LuCloudUpload,
+  LuCheck,
+  LuLoader,
 } from "react-icons/lu";
 import {
   useAssignments,
@@ -428,7 +427,7 @@ const PostToClassroomModal: React.FC<{ assignmentId: string; onClose: () => void
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-slate-700 p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <LuUploadCloud className="w-5 h-5 text-indigo-500" />
+            <LuCloudUpload className="w-5 h-5 text-indigo-500" />
             Post to Classroom
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
@@ -455,9 +454,11 @@ const PostToClassroomModal: React.FC<{ assignmentId: string; onClose: () => void
                 }`}
               >
                 {selectedCourses.includes(course.id) ? (
-                  <LuCheckSquare className="w-5 h-5 text-indigo-500" />
+                  <div className="w-5 h-5 rounded border border-indigo-500 bg-indigo-500 flex items-center justify-center">
+                    <LuCheck className="w-3.5 h-3.5 text-white" />
+                  </div>
                 ) : (
-                  <LuSquare className="w-5 h-5 text-gray-400" />
+                  <div className="w-5 h-5 rounded border border-gray-300 dark:border-slate-600" />
                 )}
                 <div>
                   <p className="font-semibold text-sm text-gray-900 dark:text-white line-clamp-1">{course.name}</p>
@@ -611,7 +612,7 @@ const AssignmentsList: React.FC = () => {
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-600 hover:text-white dark:hover:bg-green-600 transition-all flex items-center gap-1 opacity-0 group-hover:opacity-100"
                           title="Post to Google Classroom"
                         >
-                          <LuUploadCloud className="w-3.5 h-3.5" /> Post
+                          <LuCloudUpload className="w-3.5 h-3.5" /> Post
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedId(a.id); }}

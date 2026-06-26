@@ -102,6 +102,91 @@ class ClassroomService:
             raise ClassroomServiceError(f"Failed to post announcement: {str(e)}")
 
     @staticmethod
+    def upload_file_to_drive(user: User, filename: str, file_bytes: bytes, mime_type: str) -> dict:
+        """
+        Upload a file to the teacher's Google Drive using the drive.file scope.
+        Returns the Drive file ID and a shareable URL.
+        """
+        try:
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaIoBaseUpload
+            import io
+
+            creds = ClassroomService.get_credentials(user)
+            drive_service = build('drive', 'v3', credentials=creds)
+
+            file_metadata = {'name': filename}
+            media = MediaIoBaseUpload(
+                io.BytesIO(file_bytes),
+                mimetype=mime_type,
+                resumable=True
+            )
+            drive_file = drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id, webViewLink'
+            ).execute()
+
+            # Make the file readable by anyone with the link (so Classroom can display it)
+            drive_service.permissions().create(
+                fileId=drive_file['id'],
+                body={'type': 'anyone', 'role': 'reader'},
+            ).execute()
+
+            return {
+                "drive_file_id": drive_file.get("id"),
+                "drive_file_url": drive_file.get("webViewLink"),
+                "filename": filename,
+            }
+        except Exception as e:
+            raise ClassroomServiceError(f"Failed to upload file to Drive: {str(e)}")
+
+    @staticmethod
+    def create_assignment_with_drive_attachment(
+        user: User,
+        course_id: str,
+        title: str,
+        description: str,
+        max_points: float,
+        drive_file_id: str,
+        drive_file_title: str,
+    ) -> dict:
+        """
+        Create a Google Classroom assignment with a Drive file attached as material.
+        The file must already be uploaded to Drive (use upload_file_to_drive first).
+        """
+        try:
+            service = ClassroomService.get_service(user)
+            coursework = {
+                'title': title,
+                'description': description,
+                'maxPoints': max_points,
+                'workType': 'ASSIGNMENT',
+                'state': 'PUBLISHED',
+                'materials': [
+                    {
+                        'driveFile': {
+                            'driveFile': {
+                                'id': drive_file_id,
+                                'title': drive_file_title,
+                            },
+                            'shareMode': 'VIEW',
+                        }
+                    }
+                ],
+            }
+            result = service.courses().courseWork().create(
+                courseId=course_id, body=coursework
+            ).execute()
+            return {
+                "id": result.get("id"),
+                "title": result.get("title"),
+                "alternateLink": result.get("alternateLink"),
+            }
+        except Exception as e:
+            raise ClassroomServiceError(f"Failed to create assignment with attachment: {str(e)}")
+
+    @staticmethod
     def get_submissions(user: User, course_id: str, coursework_id: str):
         try:
             service = ClassroomService.get_service(user)

@@ -31,10 +31,12 @@ class Agent():
         self.agent_graph=self.agent.agent_builder()
         self.history=[]
         self.document_context=None
+        self._last_generated_document=None  # stores the last PPTX/PDF/DOCX for upload tools
 
-    @staticmethod
-    def build_prompt():
-        with open(Agent.system_prompt_path,'r',encoding='utf-8') as f:
+    def build_prompt(self):
+        prompt_name = 'teacher_system_prompt.md' if self.role == 'teacher' else 'system_prompt.md'
+        path = Path(__file__).resolve().parent.parent / 'configs' / 'prompts' / prompt_name
+        with open(path,'r',encoding='utf-8') as f:
             system_prompt=f.read().strip()
         return SystemMessage(content=system_prompt)
 
@@ -66,8 +68,17 @@ class Agent():
         print(f"[ContextLoad] Loaded direct content for '{title}' ({len(content)} chars)")
 
     async def run(self,input:list,id:str,grade_test=False,test_submission=None,grading_instructions=None,user_id=None):
-        system_prompt=Agent.build_prompt()
-        config={'configurable':{'thread_id':id, 'user_id': user_id}}
+        system_prompt=self.build_prompt()
+        # Pass document_context and the last generated document into the LangGraph config
+        # so the upload_*_to_classroom tools can access them without state changes
+        config={
+            'configurable': {
+                'thread_id': id,
+                'user_id': user_id,
+                'document_context': self.document_context or '',
+                'generated_document': self._last_generated_document,
+            }
+        }
 
         messages=self.history+input
 
@@ -87,6 +98,8 @@ class Agent():
             state_input['student_submissions']=test_submission
             if grading_instructions:
                 state_input['grading_instructions']=grading_instructions
+
+        streamed_tokens = False  # track if any conversational text was streamed
 
         async for chunk in self.agent_graph.astream(
             state_input,
@@ -110,6 +123,7 @@ class Agent():
                 
                 if content:
                     print(f"[DEBUG ChatBot] Node: {node} | Yielding content: {repr(content)}")
+                    streamed_tokens = True
                     yield {"type":"token","content":content}
 
         final_state=(await self.agent_graph.aget_state(config)).values
@@ -132,14 +146,20 @@ class Agent():
                 task_done.append(description)
                 
         if final_state.get('document'):
-            yield {"type": "document", "data": final_state['document']}
-            doc_format = final_state['document'].get('format', '').upper()
+            doc = final_state['document']
+            self._last_generated_document = doc  # persist for upload_generated_file_to_classroom
+            yield {"type": "document", "data": doc}
+            doc_format = doc.get('format', '').upper()
             task_done.append(f"{doc_format} document" if doc_format else "document")
 
         if task_done:
             task_list = " and ".join(task_done)
             confirm_msg = f"\nI have successfully generated your {task_list}! Let me know if you need anything else."
-            yield {"type": "token", "content": confirm_msg}
+            # Only emit the confirm message when no conversational text was streamed.
+            # If the LLM already replied in text (e.g. tool-result handling), skip this
+            # to prevent the response from appearing twice.
+            if not streamed_tokens:
+                yield {"type": "token", "content": confirm_msg}
 
 
 

@@ -7,7 +7,7 @@ from apps.core.views import (
     # Student — Submissions
     get_submissions, get_submission_detail, delete_submission_view,
     # Student — Performance
-    get_performance,
+    get_student_performance_view,
     # Student — Study Materials
     get_materials, get_material_detail, delete_material_view,
     # Teacher — Assignments
@@ -41,7 +41,7 @@ urlpatterns = [
     path('submissions/<uuid:submission_id>/delete/', delete_submission_view, name='delete_submission'),
 
     # ── Student: Performance ───────────────────────────────────────────────
-    path('performance/', get_performance, name='performance'),
+    path('performance/', get_student_performance_view, name='performance'),
 
     # ── Student: Study Materials ───────────────────────────────────────────
     path('materials/', get_materials, name='materials'),

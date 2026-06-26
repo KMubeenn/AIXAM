@@ -74,6 +74,7 @@ class TeacherState(BaseState, total=False):
     student_submissions: list[dict]
     grading_instructions: str
     deadline: str
+    classroom_upload_result: dict   # result from upload_*_to_classroom tools
 
 
 class TeacherAgent:
@@ -242,11 +243,12 @@ class TeacherAgent:
                 if 'options' in q:
                     for opt_key, opt_val in q['options'].items():
                         content += f" - **{opt_key})** {opt_val}\n"
-                    content += f"**Answer:** {q.get('answer')}\n"
-                if 'rubric' in q:
-                    content += f"**Rubric:** {q.get('rubric')}\n"
-                if 'explanation' in q:
-                    content += f"**Explanation:** {q.get('explanation')}\n"
+                    # Omit answer, rubric, and explanation from generated document for students
+                    # content += f"**Answer:** {q.get('answer')}\n"
+                # if 'rubric' in q:
+                #     content += f"**Rubric:** {q.get('rubric')}\n"
+                # if 'explanation' in q:
+                #     content += f"**Explanation:** {q.get('explanation')}\n"
                 content += "\n"
         elif 'slides' in source_data: # Slides
             for slide in source_data['slides']:
@@ -319,6 +321,12 @@ class TeacherAgent:
             final_state['llm_calls'] = llm_calls
             if 'messages' in final_state:
                 del final_state['messages']
+
+            # Persist the last generated document into the graph config
+            # so upload_generated_file_to_classroom can read it in the same session
+            if final_state.get('document'):
+                final_state['classroom_upload_result'] = None  # reset previous upload result
+
             return final_state
 
         except Exception as e:

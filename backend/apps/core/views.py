@@ -53,13 +53,25 @@ async def get_teacher_analytics_view(request):
         class_avg = round(submission_stats.get('avg') or 0, 1)
 
         # Top topics from StudentPerformance for students in this class
-        topic_data = await sync_to_async(
-            lambda: list(
-                StudentPerformance.objects.values('topic')
-                .annotate(avg_score=Avg('average_score'), count=Count('id'))
-                .order_by('-avg_score')[:10]
-            )
+        # Step 1: Get student IDs who submitted to this teacher's assignments
+        student_ids = await sync_to_async(
+            lambda: list(Submission.objects.filter(
+                assignment_id__in=teacher_assignment_ids
+            ).values_list('student_id', flat=True).distinct())
         )()
+
+        # Step 2: Get performance only for those students
+        if student_ids:
+            topic_data = await sync_to_async(
+                lambda: list(
+                    StudentPerformance.objects.filter(student_id__in=student_ids)
+                    .values('topic')
+                    .annotate(avg_score=Avg('average_score'), count=Count('id'))
+                    .order_by('-avg_score')[:10]
+                )
+            )()
+        else:
+            topic_data = []
 
         strongest = topic_data[0]['topic'] if topic_data else 'N/A'
         weakest = topic_data[-1]['topic'] if len(topic_data) > 1 else 'N/A'
@@ -84,6 +96,17 @@ async def get_teacher_analytics_view(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_student_performance_view(request):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'student':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        data = await CoreService.get_student_performance(user.id)
+        return JsonResponse({'performance': data})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 # ──────────────────────────────────────────────
 # FLASHCARDS

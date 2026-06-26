@@ -61,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
         />
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
         <Link
           to="/teacher-dashboard"
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
@@ -145,7 +145,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
                 <LuPlus className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-1 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-1 max-h-[30vh] overflow-y-auto pr-2 no-scrollbar">
               {sessions.length === 0 ? (
                 <p className="px-4 py-2 text-xs text-gray-400 dark:text-slate-600 italic">No recent chats</p>
               ) : (
@@ -178,10 +178,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat }) => {
         {isDropdownOpen && (
           <div className="absolute bottom-full left-4 right-4 mb-2 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-2 animate-in slide-in-from-bottom-2 duration-200 z-50">
             <div className="p-1">
-              <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-colors">
+              <Link to="/teacher-profile" className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-colors">
                 <LuUser className="w-4 h-4" />
                 View Profile
-              </button>
+              </Link>
               <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-colors">
                 <LuSettings className="w-4 h-4" />
                 Settings

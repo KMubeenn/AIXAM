@@ -53,7 +53,9 @@ class TeacherTools():
             TeacherTools.list_google_courses,
             TeacherTools.post_google_assignment,
             TeacherTools.post_google_announcement,
-            TeacherTools.get_google_submissions
+            TeacherTools.get_google_submissions,
+            TeacherTools.upload_document_to_classroom,
+            TeacherTools.upload_generated_file_to_classroom,
         ]
 
     @staticmethod
@@ -69,7 +71,9 @@ class TeacherTools():
     def list_google_courses(config: RunnableConfig) -> str:
         """
         List all Google Classroom courses the teacher is currently managing.
-        Returns the course ID, name, and description.
+        Returns a JSON list. IMPORTANT: Each item has a `course_id` field.
+        You MUST use the `course_id` value (a numeric string like "123456789") when calling
+        post_google_assignment. Do NOT use the course name as the course_id.
         """
         try:
             from apps.users.models import User
@@ -79,7 +83,16 @@ class TeacherTools():
             user = User.objects.get(id=user_id)
             
             courses = ClassroomService.list_courses(user)
-            return json.dumps(courses)
+            # Remap `id` -> `course_id` so the LLM always uses the correct field name
+            labeled = [
+                {
+                    "course_id": c["id"],
+                    "name": c["name"],
+                    "description": c.get("description", "")
+                }
+                for c in courses
+            ]
+            return json.dumps(labeled)
         except Exception as e:
             return f"Failed to list Google courses: {e}"
 
@@ -88,8 +101,11 @@ class TeacherTools():
     def post_google_assignment(course_id: str, title: str, description: str, max_points: str, config: RunnableConfig) -> str:
         """
         Create and publish a new assignment directly into a specific Google Classroom course.
+        CRITICAL: `course_id` must be the numeric ID string returned by list_google_courses
+        in the `course_id` field (e.g. "123456789"). NEVER pass the course name as course_id.
+        Always call list_google_courses first if you do not already have the course_id.
         Args:
-            course_id: The ID of the course (obtained via list_google_courses).
+            course_id: The numeric course_id (from list_google_courses `course_id` field).
             title: Title of the assignment.
             description: Detailed instructions for the assignment.
             max_points: Max grade points as a string e.g. "100".
@@ -148,3 +164,138 @@ class TeacherTools():
             return json.dumps(submissions)
         except Exception as e:
             return f"Failed to fetch submissions: {e}"
+
+    @staticmethod
+    @tool
+    def upload_document_to_classroom(
+        course_id: str,
+        title: str,
+        description: str,
+        max_points: str,
+        config: RunnableConfig,
+    ) -> str:
+        """
+        Upload the teacher's currently uploaded document to Google Classroom as an assignment attachment.
+        Use this when the teacher has uploaded a file and wants to post it to a classroom course.
+        CRITICAL: `course_id` must be the numeric ID from list_google_courses `course_id` field.
+        Always call list_google_courses first if you don't have the course_id.
+        Args:
+            course_id: Numeric course_id from list_google_courses.
+            title: Assignment title in Classroom.
+            description: Assignment instructions.
+            max_points: Maximum points as a string e.g. "100".
+        """
+        try:
+            from apps.users.models import User
+            from apps.chat.services.utilities.ClassroomService import ClassroomService
+            from apps.chat.services.utilities.DocWriter import DocumentWriter
+            import base64
+
+            user_id = config.get("configurable", {}).get("user_id")
+            if not user_id:
+                return "Error: User ID not found in context."
+            user = User.objects.get(id=user_id)
+
+            # Retrieve the document context stored in the configurable extras
+            document_text = config.get("configurable", {}).get("document_context", "")
+            if not document_text:
+                return "Error: No document has been uploaded in this session. Please upload a file first."
+
+            # Convert the text content to a DOCX in memory
+            doc_writer = DocumentWriter()
+            doc_result = doc_writer.write(title=title, content=document_text, format="docx")
+            file_bytes = base64.b64decode(doc_result["file_base64"])
+            filename = doc_result["filename"]
+            mime_type = doc_result["mime_type"]
+
+            # Upload to Drive
+            drive_result = ClassroomService.upload_file_to_drive(user, filename, file_bytes, mime_type)
+
+            # Create Classroom assignment with Drive attachment
+            cw_result = ClassroomService.create_assignment_with_drive_attachment(
+                user=user,
+                course_id=course_id,
+                title=title,
+                description=description,
+                max_points=float(max_points),
+                drive_file_id=drive_result["drive_file_id"],
+                drive_file_title=filename,
+            )
+
+            return json.dumps({
+                "status": "success",
+                "message": f"Document uploaded and posted as assignment '{title}' in Classroom.",
+                "classroom_link": cw_result.get("alternateLink"),
+                "coursework_id": cw_result.get("id"),
+                "drive_file_url": drive_result["drive_file_url"],
+            })
+        except Exception as e:
+            return f"Failed to upload document to Classroom: {e}"
+
+    @staticmethod
+    @tool
+    def upload_generated_file_to_classroom(
+        course_id: str,
+        title: str,
+        description: str,
+        max_points: str,
+        file_format: str,
+        config: RunnableConfig,
+    ) -> str:
+        """
+        Upload a file that was just generated (PPTX, PDF, or DOCX) to Google Classroom as an assignment.
+        MUST be called AFTER plan_tasks has already generated the file (slide_outline + generate_pptx, etc.).
+        The generated file is stored in the agent's state and this tool reads it from there.
+        CRITICAL: `course_id` must be the numeric ID from list_google_courses `course_id` field.
+        Args:
+            course_id: Numeric course_id from list_google_courses.
+            title: Assignment title in Classroom.
+            description: Description / instructions for students.
+            max_points: Maximum points as a string e.g. "100".
+            file_format: One of "pptx", "pdf", "docx" — must match what was just generated.
+        """
+        try:
+            from apps.users.models import User
+            from apps.chat.services.utilities.ClassroomService import ClassroomService
+            import base64
+
+            user_id = config.get("configurable", {}).get("user_id")
+            if not user_id:
+                return "Error: User ID not found in context."
+            user = User.objects.get(id=user_id)
+
+            # The generated document is stored in configurable extras by the orchestrator
+            document_info = config.get("configurable", {}).get("generated_document")
+            if not document_info:
+                return (
+                    f"Error: No generated {file_format.upper()} found in this session. "
+                    "Please generate the file first using plan_tasks, then call this tool."
+                )
+
+            file_bytes = base64.b64decode(document_info["file_base64"])
+            filename = document_info["filename"]
+            mime_type = document_info["mime_type"]
+
+            # Upload to Drive
+            drive_result = ClassroomService.upload_file_to_drive(user, filename, file_bytes, mime_type)
+
+            # Create Classroom assignment with Drive attachment
+            cw_result = ClassroomService.create_assignment_with_drive_attachment(
+                user=user,
+                course_id=course_id,
+                title=title,
+                description=description,
+                max_points=float(max_points),
+                drive_file_id=drive_result["drive_file_id"],
+                drive_file_title=filename,
+            )
+
+            return json.dumps({
+                "status": "success",
+                "message": f"{file_format.upper()} uploaded and posted as assignment '{title}' in Classroom.",
+                "classroom_link": cw_result.get("alternateLink"),
+                "coursework_id": cw_result.get("id"),
+                "drive_file_url": drive_result["drive_file_url"],
+            })
+        except Exception as e:
+            return f"Failed to upload generated file to Classroom: {e}"

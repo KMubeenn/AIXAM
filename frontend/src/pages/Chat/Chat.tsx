@@ -472,7 +472,7 @@ const Chat: React.FC = () => {
                                   </div>
                                 </div>
                                 {slides.length > 0 && (
-                                  <div className="mt-3 divide-y divide-indigo-100 dark:divide-indigo-900 bg-white dark:bg-slate-800 rounded-lg max-h-60 overflow-y-auto border border-indigo-100 dark:border-indigo-900">
+                                  <div className="mt-3 divide-y divide-indigo-100 dark:divide-indigo-900 bg-white dark:bg-slate-800 rounded-lg max-h-60 overflow-y-auto no-scrollbar border border-indigo-100 dark:border-indigo-900">
                                     {slides.map((slide: any, sIdx: number) => (
                                       <div key={sIdx} className="p-3 text-xs">
                                         <h4 className="font-bold text-gray-900 dark:text-white mb-1">Slide {sIdx + 1}: {slide.title}</h4>
@@ -501,7 +501,7 @@ const Chat: React.FC = () => {
                                 </div>
                               </div>
                               <button
-                                onClick={() => navigate('/teacher-quizzes')}
+                                onClick={() => navigate(`/teacher-quizzes?quizId=${output.record_id}`)}
                                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
                               >
                                 View Quiz
@@ -577,6 +577,26 @@ const Chat: React.FC = () => {
                                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
                               >
                                 View Assignment
+                              </button>
+                            </div>
+                          )}
+
+                          {item.type === 'teacher_quiz' && (
+                            <div className="p-4 bg-violet-50 dark:bg-violet-900/30 border border-violet-100 dark:border-violet-800 rounded-xl flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-violet-600 flex items-center justify-center text-white">
+                                  <FiClipboard className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Teacher Quiz Created</span>
+                                  <div className="text-sm text-gray-600 dark:text-slate-300">{item.text_summary || 'Ready to assign'}</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => navigate(`/teacher-quizzes?quizId=${item.record_id}`)}
+                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
+                              >
+                                View Quiz
                               </button>
                             </div>
                           )}
@@ -700,7 +720,7 @@ const Chat: React.FC = () => {
 
             {/* Attachment Browser Dropdown */}
             {showAttachmentDropdown && (
-              <div className="absolute bottom-20 left-0 z-30 bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl py-3 w-80 max-h-72 overflow-y-auto animate-in slide-in-from-bottom-5 duration-200">
+              <div className="absolute bottom-20 left-0 z-30 bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl py-3 w-80 max-h-72 overflow-y-auto no-scrollbar animate-in slide-in-from-bottom-5 duration-200">
                 <div className="px-4 pb-2 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Attach from Library</span>
                   <span className="text-[10px] text-gray-500">{materialsData?.materials?.length || 0} files</span>

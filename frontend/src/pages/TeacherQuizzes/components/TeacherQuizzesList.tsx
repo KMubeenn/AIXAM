@@ -137,12 +137,15 @@ const QuizDetailModal: React.FC<{ quizId: string; onClose: () => void }> = ({ qu
   );
 };
 
+import { useSearchParams } from "react-router-dom";
+
 // ── Teacher Quizzes List ──────────────────────────────────────────────────────
 
 const TeacherQuizzesList: React.FC = () => {
   const { data, isLoading } = useTeacherQuizzes();
   const deleteQuiz = useDeleteQuiz();
-  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(searchParams.get("quizId"));
   const quizzes = data?.quizzes ?? [];
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -155,7 +158,16 @@ const TeacherQuizzesList: React.FC = () => {
   return (
     <>
       {selectedQuizId && (
-        <QuizDetailModal quizId={selectedQuizId} onClose={() => setSelectedQuizId(null)} />
+        <QuizDetailModal 
+          quizId={selectedQuizId} 
+          onClose={() => {
+            setSelectedQuizId(null);
+            if (searchParams.has("quizId")) {
+              searchParams.delete("quizId");
+              setSearchParams(searchParams);
+            }
+          }} 
+        />
       )}
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">

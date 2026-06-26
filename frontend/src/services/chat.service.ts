@@ -75,6 +75,7 @@ export const ChatService = {
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
+        // Flush any remaining buffered content that didn't end with a newline
         const trimmed = buffer.trim();
         if (trimmed) {
           if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
@@ -88,6 +89,7 @@ export const ChatService = {
             onToken(trimmed);
           }
         }
+        buffer = ''; // clear so post-loop block doesn't double-emit
         break;
       }
 
@@ -114,20 +116,6 @@ export const ChatService = {
         
         // It's a raw token, send it with the newline that was split
         onToken(line + '\n');
-      }
-    }
-
-    // Process remaining buffer
-    if (buffer) {
-      if (buffer.trim().startsWith('{') && buffer.trim().endsWith('}')) {
-        try {
-          const parsed = JSON.parse(buffer);
-          onStructuredData(parsed);
-        } catch (e) {
-          onToken(buffer);
-        }
-      } else {
-        onToken(buffer);
       }
     }
   },

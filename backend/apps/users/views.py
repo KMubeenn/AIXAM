@@ -269,7 +269,8 @@ def _get_google_flow():
     scopes = [
         'https://www.googleapis.com/auth/classroom.courses.readonly',
         'https://www.googleapis.com/auth/classroom.coursework.students',
-        'https://www.googleapis.com/auth/classroom.announcements'
+        'https://www.googleapis.com/auth/classroom.announcements',
+        'https://www.googleapis.com/auth/drive.file',       # upload/manage files created by this app
     ]
     return Flow.from_client_config(
         client_config, 
@@ -368,7 +369,8 @@ def google_classroom_callback(request):
         
         # Redirect back to frontend
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
-        return redirect(f"{frontend_url}/classroom?success=true")
+        profile_route = f"/{user.role}-profile" if user.role in ['teacher', 'student'] else "/teacher-profile"
+        return redirect(f"{frontend_url}{profile_route}?connected=true")
         
     except Exception as e:
         return JsonResponse({"error": f"OAuth exchange failed: {e}"}, status=500)
@@ -392,3 +394,37 @@ def google_classroom_courses(request):
         if "has not authorized" in str(e):
             return JsonResponse({"error": "Google Classroom not connected"}, status=403)
         return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_profile_view(request):
+    """
+    Return basic profile data for the authenticated user, including Google connection status.
+    """
+    user = get_user_from_request(request)
+    if not user:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+    
+    # Check if they have valid google tokens
+    google_connected = bool(user.google_access_token or user.google_refresh_token)
+    google_email = None
+    
+    if google_connected:
+        try:
+            from apps.chat.services.utilities.ClassroomService import ClassroomService
+            creds = ClassroomService.get_credentials(user)
+            from googleapiclient.discovery import build
+            oauth2_service = build('oauth2', 'v2', credentials=creds)
+            user_info = oauth2_service.userinfo().get().execute()
+            google_email = user_info.get('email')
+        except Exception:
+            pass
+
+    return JsonResponse({
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "role": user.role,
+        "google_connected": google_connected,
+        "google_email": google_email
+    })
