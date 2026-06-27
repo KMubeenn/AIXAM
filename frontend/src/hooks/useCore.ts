@@ -272,10 +272,42 @@ export const usePostClassroomReport = () => {
 export const usePostAssignmentToClassroom = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ assignmentId, courseIds }: { assignmentId: string; courseIds: string[] }) =>
-      CoreService.postAssignmentToClassroom(assignmentId, courseIds),
+    mutationFn: ({
+      assignmentId, courseIds, overrides
+    }: {
+      assignmentId: string;
+      courseIds: string[];
+      overrides?: { title?: string; description?: string; max_points?: number; due_date?: string; due_time?: string };
+    }) =>
+      CoreService.postAssignmentToClassroom(assignmentId, courseIds, overrides),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    },
+  });
+};
+
+export const usePostQuizToClassroom = () => {
+  return useMutation({
+    mutationFn: ({
+      quizId, courseIds, overrides
+    }: {
+      quizId: string;
+      courseIds: string[];
+      overrides?: { title?: string; description?: string; max_points?: number; due_date?: string; due_time?: string };
+    }) =>
+      CoreService.postQuizToClassroom(quizId, courseIds, overrides),
+  });
+};
+
+export const useUpdateQuestion = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ questionId, data }: { questionId: string; data: { text?: string; points?: number } }) =>
+      CoreService.updateQuestion(questionId, data),
+    onSuccess: () => {
+      // Invalidate relevant queries (e.g. assignment detail, quiz detail)
+      queryClient.invalidateQueries({ queryKey: ['assignment'] });
+      queryClient.invalidateQueries({ queryKey: ['quiz'] });
     },
   });
 };

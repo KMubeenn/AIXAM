@@ -368,8 +368,36 @@ export const CoreService = {
     return res.data;
   },
 
-  async postAssignmentToClassroom(assignmentId: string, courseIds: string[]): Promise<{ message: string; results: any[]; errors: any[] }> {
-    const res = await api.post(`/core/assignments/${assignmentId}/post-to-classroom/`, { course_ids: courseIds });
+  async postAssignmentToClassroom(
+    assignmentId: string,
+    courseIds: string[],
+    overrides?: { title?: string; description?: string; max_points?: number }
+  ): Promise<{ message: string; results: any[]; errors: any[] }> {
+    const res = await api.post(`/core/assignments/${assignmentId}/post-to-classroom/`, {
+      course_ids: courseIds,
+      ...overrides,
+    });
+    return res.data;
+  },
+
+  async postQuizToClassroom(
+    quizId: string,
+    courseIds: string[],
+    overrides?: { title?: string; description?: string; max_points?: number }
+  ): Promise<{ message: string; results: any[]; errors: any[] }> {
+    const res = await api.post(`/core/teacher/quizzes/${quizId}/post-to-classroom/`, {
+      course_ids: courseIds,
+      ...overrides,
+    });
+    return res.data;
+  },
+
+  // ── Teacher: Questions ───────────────────────
+  async updateQuestion(
+    questionId: string,
+    data: { text?: string; points?: number }
+  ): Promise<{ message: string }> {
+    const res = await api.patch(`/core/questions/${questionId}/`, data);
     return res.data;
   },
 

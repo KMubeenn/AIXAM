@@ -426,6 +426,43 @@ async def get_assignment_submissions(request, assignment_id):
 
 
 # ──────────────────────────────────────────────
+# QUESTION UPDATE
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['PATCH'])
+async def update_question_view(request, question_id):
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+            
+        body = json.loads(request.body)
+        new_text = body.get('text')
+        
+        from apps.core.models import Question
+        try:
+            # Get the question and verify the teacher owns the parent quiz
+            q = await sync_to_async(Question.objects.select_related('quiz').get)(id=question_id)
+        except Question.DoesNotExist:
+            return JsonResponse({'error': 'Question not found'}, status=404)
+            
+        if q.quiz.created_by_id != user.id:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+            
+        if new_text is not None:
+            q.text = new_text
+            
+        if 'points' in body:
+            q.points = int(body.get('points', 1))
+            
+        await sync_to_async(q.save)()
+        return JsonResponse({'message': 'Question updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ──────────────────────────────────────────────
 # TEACHER QUIZZES
 # ──────────────────────────────────────────────
 
@@ -595,64 +632,49 @@ async def generate_class_report_view(request, assignment_id):
         if not user or user.role != 'teacher':
             return JsonResponse({'error': 'Unauthorized'}, status=401)
 
-        from apps.core.models import Assignment, Quiz
-        real_assignment_id = assignment_id
-        try:
-            await sync_to_async(Assignment.objects.get)(id=assignment_id)
-        except Assignment.DoesNotExist:
-            try:
-                quiz = await sync_to_async(Quiz.objects.get)(id=assignment_id)
-                linked_assignment = await sync_to_async(
-                    lambda: Assignment.objects.filter(quiz=quiz).first()
-                )()
-                if linked_assignment:
-                    real_assignment_id = linked_assignment.id
-                else:
-                    return JsonResponse({'error': 'No assignment links to this quiz'}, status=404)
-            except Quiz.DoesNotExist:
-                return JsonResponse({'error': 'Invalid ID'}, status=404)
-
         body = json.loads(request.body) if request.body else {}
         grades_data = body.get('grades_data')
 
-        if not grades_data:
-            # Build grades_data from DB submissions
+        # If grades_data is provided directly (e.g. from Classroom panel), skip DB lookup
+        if grades_data:
+            assignment_title = body.get('title', 'Class Report')
+        else:
+            from apps.core.models import Assignment, Quiz
+            real_assignment_id = assignment_id
+            try:
+                asgn = await sync_to_async(Assignment.objects.get)(id=assignment_id)
+                assignment_title = asgn.title
+            except Assignment.DoesNotExist:
+                try:
+                    quiz = await sync_to_async(Quiz.objects.get)(id=assignment_id)
+                    linked = await sync_to_async(lambda: Assignment.objects.filter(quiz=quiz).first())()
+                    if linked:
+                        real_assignment_id = linked.id
+                        assignment_title = linked.title
+                    else:
+                        return JsonResponse({'error': 'No assignment linked to this quiz'}, status=404)
+                except Quiz.DoesNotExist:
+                    return JsonResponse({'error': 'Invalid assignment ID'}, status=404)
+
             submissions = await CoreService.get_batch_grades_for_assignment(real_assignment_id)
             if not submissions:
                 return JsonResponse({'error': 'No grading data found for this assignment'}, status=404)
 
-            grades = []
-            total_score = 0
-            for s in submissions:
-                score = s.get('score') or 0
-                total_score += score
-                grades.append({
-                    'student_name': s['student_name'],
-                    'marks': score,
-                    'max_marks': 100,
-                    'feedback': s.get('feedback', ''),
-                })
-            class_avg = total_score / len(submissions) if submissions else 0
+            total_score = sum(s.get('score') or 0 for s in submissions)
             grades_data = {
-                'grades': grades,
+                'grades': [{'student_name': s['student_name'], 'marks': s.get('score') or 0, 'max_marks': 100, 'feedback': s.get('feedback', '')} for s in submissions],
                 'total_marks': total_score,
                 'max_total_marks': 100 * len(submissions),
                 'overall_feedback': '',
-                'class_average': class_avg,
+                'class_average': total_score / len(submissions) if submissions else 0,
             }
-
-        # Get assignment title for the report
-        try:
-            assignment = await sync_to_async(Assignment.objects.get)(id=real_assignment_id)
-            assignment_title = assignment.title
-        except Assignment.DoesNotExist:
-            assignment_title = 'Assignment'
 
         from apps.chat.services.utilities.ReportGenerator import generate_class_report_pdf
         report = await sync_to_async(generate_class_report_pdf)(assignment_title, grades_data)
         return JsonResponse(report)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 
 @csrf_exempt
@@ -754,19 +776,122 @@ async def post_assignment_to_classroom_view(request, assignment_id):
         if assignment.created_by_id != user.id:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        # Build description from assignment questions if available
-        from apps.core.models import Question
+        # Assignment questions are stored in description (as text), not in the Question model
+        title = body.get('title') or assignment.title
+        extra_desc = body.get('description', '')
+        due_date_str = body.get('due_date')
+        due_time_str = body.get('due_time')
+        
+        # Build the base description
+        description = (extra_desc + '\n\n' if extra_desc else '') + (assignment.description or f"Assignment: {assignment.title}")
+
+        # If this assignment is backed by a quiz, fetch the questions and append them
+        quiz_id = getattr(assignment, 'quiz_id', None)
+        if quiz_id:
+            from apps.core.models import Question
+            questions = await sync_to_async(
+                lambda: list(Question.objects.filter(quiz_id=quiz_id).order_by('id'))
+            )()
+            if questions:
+                description += "\n\n--- Questions ---\n\n"
+                for i, q in enumerate(questions, 1):
+                    # Strip the rubric part out of the text so students don't see it
+                    question_text = q.text.split("\n\nRUBRIC:")[0].strip() if q.text else ""
+                    description += f"{i}. {question_text}\n"
+                    description += f"Points: {q.points}\n\n"
+
+        max_points = float(body.get('max_points') or assignment.total_marks or 100)
+
+        from apps.chat.services.utilities.ClassroomService import ClassroomService
+
+        results = []
+        errors = []
+        for course_id in course_ids:
+            try:
+                result = await sync_to_async(ClassroomService.post_assignment)(
+                    user, course_id, title, description, max_points, due_date_str, due_time_str
+                )
+                results.append({'course_id': course_id, 'coursework_id': result.get('id'), 'status': 'success'})
+            except Exception as e:
+                errors.append({'course_id': course_id, 'error': str(e)})
+
+        return JsonResponse({
+            'message': f'Posted to {len(results)} classroom(s).',
+            'results': results,
+            'errors': errors,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+
+# ──────────────────────────────────────────────
+# POST QUIZ TO CLASSROOM
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def post_quiz_to_classroom_view(request, quiz_id):
+    """
+    Post a saved AIXAM teacher quiz to one or more Google Classroom courses as an assignment.
+    Answer keys and explanations are stripped before posting.
+
+    Body:
+        {
+            "course_ids": ["course_id_1", ...],   // required
+            "title":       "Custom Title",          // optional override
+            "description": "Extra instructions",    // optional override
+            "max_points":  100                      // optional override
+        }
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        body = json.loads(request.body) if request.body else {}
+        course_ids = body.get('course_ids', [])
+        if not course_ids:
+            return JsonResponse({'error': 'course_ids is required and must be a non-empty list'}, status=400)
+
+        from apps.core.models import Quiz, Question, Choice
+        try:
+            quiz = await sync_to_async(Quiz.objects.select_related('created_by').get)(id=quiz_id)
+        except Quiz.DoesNotExist:
+            return JsonResponse({'error': 'Quiz not found'}, status=404)
+
+        if quiz.created_by_id != user.id:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        # Build a student-safe description from quiz questions (no answers/explanations)
         questions = await sync_to_async(
-            lambda: list(Question.objects.filter(assignment=assignment).order_by('id'))
+            lambda: list(Question.objects.filter(quiz=quiz).prefetch_related('choices').order_by('id'))
         )()
 
-        description = assignment.description or f"Assignment: {assignment.title}"
-        if questions:
-            description += "\n\nQuestions:\n"
-            for idx, q in enumerate(questions, 1):
-                description += f"Q{idx}. {q.text or q.question if hasattr(q, 'question') else ''}\n"
-                if hasattr(q, 'points') and q.points:
-                    description += f"   [{q.points} marks]\n"
+        title = body.get('title') or quiz.title
+        extra_description = body.get('description', '')
+        max_points = float(body.get('max_points', 100))
+        due_date_str = body.get('due_date')
+        due_time_str = body.get('due_time')
+
+        description = extra_description + ('\n\n' if extra_description else '')
+        description += f"Quiz: {quiz.title}\n\n"
+
+        for idx, q in enumerate(questions, 1):
+            # Strip out EXPLANATION and RUBRIC sections
+            question_text = (q.text or '').split('\n\nEXPLANATION:')[0]
+            question_text = question_text.split('\n\nRUBRIC:')[0].strip()
+            
+            description += f"Q{idx}. {question_text}\n"
+            if q.points:
+                description += f"   [{q.points} mark{'s' if q.points != 1 else ''}]\n"
+
+            # Include choices but remove is_correct marking
+            choices = await sync_to_async(lambda q=q: list(q.choices.all()))()
+            if choices:
+                for i, choice in enumerate(choices):
+                    description += f"   {chr(65 + i)}) {choice.text}\n"
+            description += "\n"
 
         from apps.chat.services.utilities.ClassroomService import ClassroomService
 
@@ -777,9 +902,11 @@ async def post_assignment_to_classroom_view(request, assignment_id):
                 result = await sync_to_async(ClassroomService.post_assignment)(
                     user,
                     course_id,
-                    assignment.title,
-                    description,
-                    float(assignment.total_marks or 100)
+                    title,
+                    description.strip(),
+                    max_points,
+                    due_date_str,
+                    due_time_str
                 )
                 results.append({'course_id': course_id, 'coursework_id': result.get('id'), 'status': 'success'})
             except Exception as e:

@@ -26,29 +26,143 @@ import {
   useGenerateClassReport,
   usePostAssignmentToClassroom,
   useClassroomCourses,
+  useUpdateQuestion,
 } from "../../../hooks/useCore";
-import { Assignment, AssignmentSubmission } from "../../../services/core.service";
+import {
+  Assignment,
+  AssignmentSubmission,
+} from "../../../services/core.service";
+// ── Question Item (Editable Rubric) ──────────────────────────────────────────
 
-// ── Assignment Detail Modal ────────────────────────────────────────────────────
+const QuestionItem: React.FC<{ q: any; idx: number }> = ({ q, idx }) => {
+  const [questionText, initialRubric] = (q.text || "").split("\n\nRUBRIC:");
+  const [isEditing, setIsEditing] = useState(false);
+  const [rubricText, setRubricText] = useState(initialRubric ? initialRubric.trim() : "");
+  const [points, setPoints] = useState<number>(q.points || 1);
+  const [errorMsg, setErrorMsg] = useState("");
+  const updateQuestion = useUpdateQuestion();
 
-const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => void }> = ({ assignmentId, onClose }) => {
-  const { data: assignmentData, isLoading: loadingAssignment } = useAssignment(assignmentId);
-  const { data: submissionsData, isLoading: loadingSubs } = useAssignmentSubmissions(assignmentId);
+  const handleSave = async () => {
+    setErrorMsg("");
+    try {
+      const newText = `${questionText.trim()}\n\nRUBRIC:${rubricText.trim()}`;
+      await updateQuestion.mutateAsync({ questionId: q.id, data: { text: newText, points } });
+      setIsEditing(false);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || err.message || "Failed to update question");
+    }
+  };
+
+  return (
+    <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 space-y-2">
+      <div className="flex items-start gap-3">
+        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center">
+          {idx + 1}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">
+            {questionText}
+          </p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-xs text-gray-400 dark:text-slate-500 capitalize">
+              {q.question_type}
+            </span>
+            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+              {isEditing ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="1"
+                    value={points}
+                    onChange={(e) => setPoints(Number(e.target.value))}
+                    className="w-16 px-2 py-1 text-xs font-normal border border-indigo-200 dark:border-indigo-800 rounded bg-white dark:bg-slate-900 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  />
+                  <span>pts</span>
+                </div>
+              ) : (
+                `${q.points} pts`
+              )}
+            </span>
+            {!isEditing && (
+              <button
+                onClick={() => { setIsEditing(true); setErrorMsg(""); setPoints(q.points); }}
+                className="text-xs font-medium text-indigo-500 hover:text-indigo-600 ml-auto flex items-center gap-1"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {isEditing ? (
+        <div className="pl-9 mt-2 space-y-2">
+          {errorMsg && <p className="text-xs text-red-500 mb-2">{errorMsg}</p>}
+          <textarea
+            value={rubricText}
+            onChange={(e) => setRubricText(e.target.value)}
+            className="w-full text-xs text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800 focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
+            rows={3}
+            placeholder="Enter grading rubric..."
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setRubricText(initialRubric ? initialRubric.trim() : "");
+                setPoints(q.points);
+                setErrorMsg("");
+              }}
+              className="px-3 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:hover:text-slate-300 bg-gray-100 dark:bg-slate-800 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={updateQuestion.isPending}
+              className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-1 transition-colors"
+            >
+              {updateQuestion.isPending && <LuLoader className="w-3 h-3 animate-spin" />} Save
+            </button>
+          </div>
+        </div>
+      ) : (
+        rubricText && (
+          <div className="pl-9 text-xs text-gray-500 dark:text-slate-400 bg-amber-50/20 dark:bg-amber-950/10 p-2.5 rounded-lg border border-amber-100/20">
+            <span className="font-semibold text-amber-600 dark:text-amber-400 mr-1">
+              Rubric:
+            </span>
+            {rubricText}
+          </div>
+        )
+      )}
+    </div>
+  );
+};
+
+const AssignmentDetailModal: React.FC<{
+  assignmentId: string;
+  onClose: () => void;
+}> = ({ assignmentId, onClose }) => {
+  const { data: assignmentData, isLoading: loadingAssignment } =
+    useAssignment(assignmentId);
+  const { data: submissionsData, isLoading: loadingSubs } =
+    useAssignmentSubmissions(assignmentId);
   const assignment = assignmentData?.assignment;
   const submissions = submissionsData?.submissions ?? [];
 
-  // Mutations
   const gradeSubmission = useGradeLocalSubmission();
   const postClassroomReport = usePostClassroomReport();
   const generateReport = useGenerateClassReport();
 
-  // Local state
-  const [gradingSubmission, setGradingSubmission] = useState<AssignmentSubmission | null>(null);
+  const [gradingSubmission, setGradingSubmission] =
+    useState<AssignmentSubmission | null>(null);
   const [gradeScore, setGradeScore] = useState<number>(0);
   const [gradeFeedback, setGradeFeedback] = useState<string>("");
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [postingReport, setPostingReport] = useState(false);
   const [savingGrade, setSavingGrade] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const startGrading = (sub: AssignmentSubmission) => {
     setGradingSubmission(sub);
@@ -59,6 +173,7 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
   const handleSaveGrade = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!gradingSubmission) return;
+    setStatusMsg(null);
     try {
       setSavingGrade(true);
       await gradeSubmission.mutateAsync({
@@ -67,14 +182,16 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
         feedback: gradeFeedback,
       });
       setGradingSubmission(null);
+      setStatusMsg({ type: 'success', text: 'Grade updated successfully.' });
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message || "Failed to update grade");
+      setStatusMsg({ type: 'error', text: err.response?.data?.error || err.message || "Failed to update grade" });
     } finally {
       setSavingGrade(false);
     }
   };
 
   const handleDownloadReport = async () => {
+    setStatusMsg(null);
     try {
       setGeneratingPdf(true);
       const res = await generateReport.mutateAsync({ assignmentId });
@@ -94,19 +211,20 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message || "Failed to generate report");
+      setStatusMsg({ type: 'error', text: err.response?.data?.error || err.message || "Failed to generate report" });
     } finally {
       setGeneratingPdf(false);
     }
   };
 
   const handlePostReport = async () => {
+    setStatusMsg(null);
     try {
       setPostingReport(true);
       await postClassroomReport.mutateAsync(assignmentId);
-      alert("Performance report has been posted to Google Classroom successfully!");
+      setStatusMsg({ type: 'success', text: 'Performance report has been posted to Google Classroom successfully!' });
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message || "Failed to post report to Classroom");
+      setStatusMsg({ type: 'error', text: err.response?.data?.error || err.message || "Failed to post report to Classroom" });
     } finally {
       setPostingReport(false);
     }
@@ -138,11 +256,25 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
           </button>
         </div>
 
+        {/* Inline Status Banner */}
+        {statusMsg && (
+          <div className={`mx-6 mt-4 flex items-start gap-2 px-4 py-3 rounded-xl text-sm font-medium border ${
+            statusMsg.type === 'success'
+              ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+              : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+          }`}>
+            {statusMsg.type === 'success' ? '✓' : '✕'} {statusMsg.text}
+          </div>
+        )}
+
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
           {loadingAssignment ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-10 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                <div
+                  key={i}
+                  className="h-10 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse"
+                />
               ))}
             </div>
           ) : assignment ? (
@@ -150,17 +282,27 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
               {/* Meta */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">Total Marks</p>
-                  <p className="font-bold text-gray-900 dark:text-white">{assignment.total_marks}</p>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">Deadline</p>
-                  <p className="font-bold text-gray-900 dark:text-white text-sm">
-                    {assignment.deadline ? new Date(assignment.deadline).toLocaleDateString() : "—"}
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">
+                    Total Marks
+                  </p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {assignment.total_marks}
                   </p>
                 </div>
                 <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">Created</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">
+                    Deadline
+                  </p>
+                  <p className="font-bold text-gray-900 dark:text-white text-sm">
+                    {assignment.deadline
+                      ? new Date(assignment.deadline).toLocaleDateString()
+                      : "—"}
+                  </p>
+                </div>
+                <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">
+                    Created
+                  </p>
                   <p className="font-bold text-gray-900 dark:text-white text-sm">
                     {new Date(assignment.created_at).toLocaleDateString()}
                   </p>
@@ -170,7 +312,9 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
               {/* Description */}
               {assignment.description && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Description</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                    Description
+                  </h3>
                   <p className="text-sm text-gray-600 dark:text-slate-400 leading-relaxed bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
                     {assignment.description}
                   </p>
@@ -185,31 +329,9 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                     Questions ({(assignment as any).questions.length})
                   </h3>
                   <div className="space-y-2">
-                    {(assignment as any).questions.map((q: any, idx: number) => {
-                      const [questionText, rubric] = (q.text || "").split("\n\nRUBRIC:");
-                      return (
-                        <div key={q.id} className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 space-y-2">
-                          <div className="flex items-start gap-3">
-                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center">
-                              {idx + 1}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">{questionText}</p>
-                              <div className="flex items-center gap-3 mt-2">
-                                <span className="text-xs text-gray-400 dark:text-slate-500 capitalize">{q.question_type}</span>
-                                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{q.points} pts</span>
-                              </div>
-                            </div>
-                          </div>
-                          {rubric && (
-                            <div className="pl-9 text-xs text-gray-500 dark:text-slate-400 bg-amber-50/20 dark:bg-amber-950/10 p-2.5 rounded-lg border border-amber-100/20">
-                              <span className="font-semibold text-amber-600 dark:text-amber-400 mr-1">Rubric:</span>
-                              {rubric.trim()}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {(assignment as any).questions.map((q: any, idx: number) => (
+                      <QuestionItem key={q.id} q={q} idx={idx} />
+                    ))}
                   </div>
                 </div>
               )}
@@ -235,7 +357,9 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                       min="0"
                       max={assignment?.total_marks ?? 100}
                       value={gradeScore}
-                      onChange={(e) => setGradeScore(parseFloat(e.target.value) || 0)}
+                      onChange={(e) =>
+                        setGradeScore(parseFloat(e.target.value) || 0)
+                      }
                       className="w-full px-3.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       required
                     />
@@ -320,13 +444,18 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
             {loadingSubs ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-12 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                  <div
+                    key={i}
+                    className="h-12 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse"
+                  />
                 ))}
               </div>
             ) : submissions.length === 0 ? (
               <div className="text-center py-10 bg-gray-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">
                 <LuUser className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-400 dark:text-slate-500">No submissions yet</p>
+                <p className="text-sm text-gray-400 dark:text-slate-500">
+                  No submissions yet
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
@@ -342,10 +471,15 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                     {submissions.map((s) => (
-                      <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <tr
+                        key={s.id}
+                        className="hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors"
+                      >
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                           <div>
-                            <p className="font-semibold text-xs">{s.student_name}</p>
+                            <p className="font-semibold text-xs">
+                              {s.student_name}
+                            </p>
                             {s.feedback && (
                               <p className="text-[10px] text-gray-400 dark:text-slate-500 italic mt-0.5 line-clamp-1">
                                 Feedback: {s.feedback}
@@ -359,7 +493,9 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                               {s.score} / {assignment?.total_marks}
                             </span>
                           ) : (
-                            <span className="text-gray-400 dark:text-slate-500">—</span>
+                            <span className="text-gray-400 dark:text-slate-500">
+                              —
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -374,7 +510,9 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-400 dark:text-slate-500 text-xs">
-                          {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : "—"}
+                          {s.submitted_at
+                            ? new Date(s.submitted_at).toLocaleDateString()
+                            : "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
@@ -399,87 +537,199 @@ const AssignmentDetailModal: React.FC<{ assignmentId: string; onClose: () => voi
 
 // ── Post to Classroom Modal ────────────────────────────────────────────────────
 
-const PostToClassroomModal: React.FC<{ assignmentId: string; onClose: () => void }> = ({ assignmentId, onClose }) => {
+const PostToClassroomModal: React.FC<{
+  assignmentId: string;
+  onClose: () => void;
+}> = ({ assignmentId, onClose }) => {
   const { data, isLoading } = useClassroomCourses();
   const postMutation = usePostAssignmentToClassroom();
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customDescription, setCustomDescription] = useState("");
+  const [customMaxPoints, setCustomMaxPoints] = useState("");
+  const [customDueDate, setCustomDueDate] = useState("");
+  const [customDueTime, setCustomDueTime] = useState("");
+  const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const courses = data?.courses ?? [];
 
   const toggleCourse = (id: string) => {
-    setSelectedCourses(prev =>
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    setSelectedCourses((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
     );
   };
 
   const handlePost = async () => {
     if (selectedCourses.length === 0) return;
+    setStatusMsg(null);
     try {
-      await postMutation.mutateAsync({ assignmentId, courseIds: selectedCourses });
-      alert("Successfully posted assignment to selected classrooms!");
-      onClose();
+      const overrides: { title?: string; description?: string; max_points?: number; due_date?: string; due_time?: string } = {};
+      if (customTitle.trim()) overrides.title = customTitle.trim();
+      if (customDescription.trim()) overrides.description = customDescription.trim();
+      if (customMaxPoints.trim()) overrides.max_points = parseFloat(customMaxPoints);
+      if (customDueDate) overrides.due_date = customDueDate;
+      if (customDueTime) overrides.due_time = customDueTime + ":00"; // Append seconds for classroom API format
+
+      const result = await postMutation.mutateAsync({ 
+        assignmentId, 
+        courseIds: selectedCourses, 
+        overrides 
+      });
+
+      const errCount = result.errors?.length ?? 0;
+      const okCount = result.results?.length ?? 0;
+      if (errCount > 0 && okCount === 0) {
+        setStatusMsg({ type: 'error', text: result.errors[0]?.error || 'Failed to post to any classroom.' });
+      } else if (errCount > 0) {
+        setStatusMsg({ type: 'success', text: `Posted to ${okCount} classroom(s). ${errCount} failed.` });
+      } else {
+        setStatusMsg({ type: 'success', text: `Successfully posted to ${okCount} classroom(s)!` });
+        setTimeout(onClose, 1500);
+      }
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message || "Failed to post to classroom");
+      setStatusMsg({ type: 'error', text: err.response?.data?.error || err.message || 'Failed to post to classroom.' });
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-slate-700 p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-slate-800">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <LuCloudUpload className="w-5 h-5 text-indigo-500" />
             Post to Classroom
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors p-1"
+          >
             <LuX className="w-5 h-5" />
           </button>
         </div>
-        
+
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {/* Inline status banner */}
+          {statusMsg && (
+            <div className={`flex items-start gap-2 px-4 py-3 rounded-xl text-sm font-medium border ${
+              statusMsg.type === 'success'
+                ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+            }`}>
+              {statusMsg.type === 'success' ? '✓' : '✕'} {statusMsg.text}
+            </div>
+          )}
+
         {isLoading ? (
           <div className="space-y-3">
-            {[1,2,3].map(i => <div key={i} className="h-12 bg-gray-100 dark:bg-slate-800 animate-pulse rounded-xl" />)}
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-12 bg-gray-100 dark:bg-slate-800 animate-pulse rounded-xl"
+              />
+            ))}
           </div>
         ) : courses.length === 0 ? (
-          <p className="text-gray-500 dark:text-slate-400 text-sm text-center py-4">No Google Classroom courses found.</p>
+          <p className="text-gray-500 dark:text-slate-400 text-sm text-center py-4">
+            No Google Classroom courses found.
+          </p>
         ) : (
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-            {courses.map(course => (
-              <div 
-                key={course.id} 
-                onClick={() => toggleCourse(course.id)}
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                  selectedCourses.includes(course.id) 
-                    ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20" 
-                    : "border-gray-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700"
-                }`}
-              >
-                {selectedCourses.includes(course.id) ? (
-                  <div className="w-5 h-5 rounded border border-indigo-500 bg-indigo-500 flex items-center justify-center">
-                    <LuCheck className="w-3.5 h-3.5 text-white" />
+          <div>
+            <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Select Classrooms</p>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+              {courses.map((course) => (
+                <div
+                  key={course.id}
+                  onClick={() => toggleCourse(course.id)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    selectedCourses.includes(course.id)
+                      ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20"
+                      : "border-gray-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700"
+                  }`}
+                >
+                  {selectedCourses.includes(course.id) ? (
+                    <div className="w-5 h-5 rounded border border-indigo-500 bg-indigo-500 flex items-center justify-center">
+                      <LuCheck className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  ) : (
+                    <div className="w-5 h-5 rounded border border-gray-300 dark:border-slate-600" />
+                  )}
+                  <div>
+                    <p className="font-semibold text-sm text-gray-900 dark:text-white line-clamp-1">
+                      {course.name}
+                    </p>
+                    {course.description && (
+                      <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">
+                        {course.description}
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <div className="w-5 h-5 rounded border border-gray-300 dark:border-slate-600" />
-                )}
-                <div>
-                  <p className="font-semibold text-sm text-gray-900 dark:text-white line-clamp-1">{course.name}</p>
-                  {course.description && <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">{course.description}</p>}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+        {/* Optional Overrides */}
+        <div className="space-y-3 border-t border-gray-100 dark:border-slate-800 pt-4">
+          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Additional Info (Optional)</p>
+          <input
+            type="text"
+            placeholder="Custom title (leave blank to use original)"
+            value={customTitle}
+            onChange={e => setCustomTitle(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+          />
+          <textarea
+            placeholder="Extra instructions or notes for students..."
+            value={customDescription}
+            onChange={e => setCustomDescription(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none"
+          />
+          <div className="flex gap-3">
+            <input
+              type="number"
+              placeholder="Max points (100)"
+              value={customMaxPoints}
+              onChange={e => setCustomMaxPoints(e.target.value)}
+              min={1}
+              className="w-1/3 px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+            />
+            <input
+              type="date"
+              value={customDueDate}
+              onChange={e => setCustomDueDate(e.target.value)}
+              className="w-1/3 px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+            />
+            <input
+              type="time"
+              value={customDueTime}
+              onChange={e => setCustomDueTime(e.target.value)}
+              className="w-1/3 px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+            />
+          </div>
+        </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-b-2xl flex justify-end gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+          >
             Cancel
           </button>
-          <button 
+          <button
             onClick={handlePost}
             disabled={selectedCourses.length === 0 || postMutation.isPending}
             className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
           >
-            {postMutation.isPending && <LuLoader className="w-4 h-4 animate-spin" />}
-            Post ({selectedCourses.length})
+            {postMutation.isPending && (
+              <LuLoader className="w-4 h-4 animate-spin" />
+            )}
+            Post to {selectedCourses.length} Classroom
+            {selectedCourses.length !== 1 ? "s" : ""}
           </button>
         </div>
       </div>
@@ -487,19 +737,24 @@ const PostToClassroomModal: React.FC<{ assignmentId: string; onClose: () => void
   );
 };
 
-
 // ── Assignments List ───────────────────────────────────────────────────────────
 
 const AssignmentsList: React.FC = () => {
   const { data, isLoading } = useAssignments();
   const deleteAssignment = useDeleteAssignment();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [postModalAssignmentId, setPostModalAssignmentId] = useState<string | null>(null);
+  const [postModalAssignmentId, setPostModalAssignmentId] = useState<
+    string | null
+  >(null);
   const assignments = (data?.assignments ?? []) as Assignment[];
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm("Delete this assignment and all linked data? This cannot be undone.")) {
+    if (
+      confirm(
+        "Delete this assignment and all linked data? This cannot be undone.",
+      )
+    ) {
       deleteAssignment.mutate(id);
     }
   };
@@ -513,17 +768,26 @@ const AssignmentsList: React.FC = () => {
   return (
     <>
       {selectedId && (
-        <AssignmentDetailModal assignmentId={selectedId} onClose={() => setSelectedId(null)} />
+        <AssignmentDetailModal
+          assignmentId={selectedId}
+          onClose={() => setSelectedId(null)}
+        />
       )}
       {postModalAssignmentId && (
-        <PostToClassroomModal assignmentId={postModalAssignmentId} onClose={() => setPostModalAssignmentId(null)} />
+        <PostToClassroomModal
+          assignmentId={postModalAssignmentId}
+          onClose={() => setPostModalAssignmentId(null)}
+        />
       )}
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
         {isLoading ? (
           <div className="space-y-px">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-16 bg-gray-50 dark:bg-slate-800/50 animate-pulse" />
+              <div
+                key={i}
+                className="h-16 bg-gray-50 dark:bg-slate-800/50 animate-pulse"
+              />
             ))}
           </div>
         ) : assignments.length === 0 ? (
@@ -531,9 +795,12 @@ const AssignmentsList: React.FC = () => {
             <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-400 mb-4">
               <LuWand className="w-8 h-8" />
             </div>
-            <h4 className="text-lg font-semibold text-gray-700 dark:text-slate-300 mb-1">No assignments yet</h4>
+            <h4 className="text-lg font-semibold text-gray-700 dark:text-slate-300 mb-1">
+              No assignments yet
+            </h4>
             <p className="text-sm text-gray-400 dark:text-slate-500 max-w-xs">
-              Use the AI Chat to generate assignments. They'll appear here once created.
+              Use the AI Chat to generate assignments. They'll appear here once
+              created.
             </p>
           </div>
         ) : (
@@ -562,7 +829,9 @@ const AssignmentsList: React.FC = () => {
                         <LuClipboardList className="w-4 h-4 text-indigo-500 flex-shrink-0" />
                         <span className="line-clamp-1">{a.title}</span>
                         {a.course_id && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold">GC</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold">
+                            GC
+                          </span>
                         )}
                       </div>
                     </td>
@@ -573,20 +842,26 @@ const AssignmentsList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       {a.deadline ? (
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                          isUpcomingSoon(a.deadline)
-                             ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
-                             : new Date(a.deadline) < new Date()
-                               ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                               : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400"
-                        }`}>
+                        <span
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                            isUpcomingSoon(a.deadline)
+                              ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                              : new Date(a.deadline) < new Date()
+                                ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400"
+                          }`}
+                        >
                           {new Date(a.deadline).toLocaleDateString()}
                         </span>
                       ) : (
-                        <span className="text-gray-400 dark:text-slate-500">—</span>
+                        <span className="text-gray-400 dark:text-slate-500">
+                          —
+                        </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 font-semibold text-indigo-600 dark:text-indigo-400">{a.total_marks}</td>
+                    <td className="px-6 py-4 font-semibold text-indigo-600 dark:text-indigo-400">
+                      {a.total_marks}
+                    </td>
                     <td className="px-6 py-4 text-gray-400 dark:text-slate-500">
                       {new Date(a.created_at).toLocaleDateString()}
                     </td>
@@ -602,20 +877,28 @@ const AssignmentsList: React.FC = () => {
                           </span>
                         )
                       ) : (
-                        <span className="text-gray-400 dark:text-slate-500">No Submissions</span>
+                        <span className="text-gray-400 dark:text-slate-500">
+                          No Submissions
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={(e) => { e.stopPropagation(); setPostModalAssignmentId(a.id); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPostModalAssignmentId(a.id);
+                          }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-600 hover:text-white dark:hover:bg-green-600 transition-all flex items-center gap-1 opacity-0 group-hover:opacity-100"
                           title="Post to Google Classroom"
                         >
                           <LuCloudUpload className="w-3.5 h-3.5" /> Post
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedId(a.id); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedId(a.id);
+                          }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 transition-all flex items-center gap-1"
                         >
                           <LuEye className="w-3.5 h-3.5" /> View

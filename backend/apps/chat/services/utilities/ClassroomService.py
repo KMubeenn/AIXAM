@@ -64,7 +64,7 @@ class ClassroomService:
             raise ClassroomServiceError(f"Failed to list coursework: {str(e)}")
 
     @staticmethod
-    def post_assignment(user: User, course_id: str, title: str, description: str, max_points: float = 100):
+    def post_assignment(user: User, course_id: str, title: str, description: str, max_points: float = 100, due_date_str: str = None, due_time_str: str = None):
         try:
             service = ClassroomService.get_service(user)
             coursework = {
@@ -74,8 +74,27 @@ class ClassroomService:
                 'workType': 'ASSIGNMENT',
                 'state': 'PUBLISHED'
             }
-            # Optional: Add deadline logic here into coursework['dueDate'] & coursework['dueTime'] if needed
             
+            if due_date_str:
+                # Expects 'YYYY-MM-DD'
+                parts = due_date_str.split('-')
+                if len(parts) == 3:
+                    coursework['dueDate'] = {
+                        'year': int(parts[0]),
+                        'month': int(parts[1]),
+                        'day': int(parts[2])
+                    }
+                    # Default time to 23:59:59 if no time provided
+                    if due_time_str:
+                        time_parts = due_time_str.split(':')
+                        coursework['dueTime'] = {
+                            'hours': int(time_parts[0]),
+                            'minutes': int(time_parts[1]),
+                            'seconds': int(time_parts[2]) if len(time_parts) > 2 else 0
+                        }
+                    else:
+                        coursework['dueTime'] = {'hours': 23, 'minutes': 59, 'seconds': 59}
+
             coursework = service.courses().courseWork().create(
                 courseId=course_id, body=coursework).execute()
                 
@@ -85,7 +104,13 @@ class ClassroomService:
                 "alternateLink": coursework.get("alternateLink")
             }
         except Exception as e:
-            raise ClassroomServiceError(f"Failed to post assignment: {str(e)}")
+            error_msg = str(e)
+            import re
+            match = re.search(r'returned "(.*?)"', error_msg)
+            if match:
+                clean_msg = match.group(1)
+                raise ClassroomServiceError(f"Classroom API Error: {clean_msg}")
+            raise ClassroomServiceError(f"Failed to post assignment: {error_msg}")
 
     @staticmethod
     def post_announcement(user: User, course_id: str, text: str):
