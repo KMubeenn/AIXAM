@@ -18,7 +18,7 @@ from apps.chat.services.agents.student import StudentAgent
 from apps.chat.services.agents.teacher import TeacherAgent
 from apps.chat.services.agents.teacher import TeacherState
 from apps.chat.services.utilities.DocReader import DocumentReader
-from langchain.messages import SystemMessage,HumanMessage,AIMessageChunk
+from langchain_core.messages import SystemMessage,HumanMessage,AIMessageChunk,AIMessage
 from langchain.chat_models import init_chat_model
 
 
@@ -108,21 +108,21 @@ class Agent():
         ):
             message,meta_data=chunk
             node = meta_data.get("langgraph_node")
-            if (node=="llm_call"
-                and isinstance(message,AIMessageChunk)
-                and message.content):
-                content = message.content
-                if isinstance(content, list):
-                    text_parts = []
-                    for part in content:
-                        if isinstance(part, dict) and "text" in part:
-                            text_parts.append(part["text"])
-                        elif isinstance(part, str):
-                            text_parts.append(part)
-                    content = "".join(text_parts)
-                
+            
+            # We only yield text content from the conversational llm_call node.
+            # Other nodes (like orchestrator) emit structured JSON which shouldn't be streamed.
+            if node == "llm_call" and isinstance(message, (AIMessageChunk, AIMessage)):
+                content = getattr(message, 'content', '')
                 if content:
-                    print(f"[DEBUG ChatBot] Node: {node} | Yielding content: {repr(content)}")
+                    if isinstance(content, list):
+                        text_parts = []
+                        for part in content:
+                            if isinstance(part, dict) and "text" in part:
+                                text_parts.append(part["text"])
+                            elif isinstance(part, str):
+                                text_parts.append(part)
+                        content = "".join(text_parts)
+                    
                     streamed_tokens = True
                     yield {"type":"token","content":content}
 
@@ -160,6 +160,10 @@ class Agent():
             # to prevent the response from appearing twice.
             if not streamed_tokens:
                 yield {"type": "token", "content": confirm_msg}
+        elif not streamed_tokens:
+            # If the LLM generated no text and no tools were executed, emit a fallback
+            # so the frontend doesn't just hang waiting for a response that never came.
+            yield {"type": "token", "content": "I'm sorry, I couldn't process that request properly. Could you rephrase?"}
 
 
 

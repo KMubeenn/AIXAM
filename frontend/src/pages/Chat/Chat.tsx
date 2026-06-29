@@ -152,6 +152,7 @@ const Chat: React.FC = () => {
         <TeacherSidebar
           onSessionSelect={handleSessionSelect}
           onNewChat={handleNewChat}
+          activeSessionId={sessionId}
         />
       ) : (
         <StudentSidebar

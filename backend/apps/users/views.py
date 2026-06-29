@@ -270,6 +270,9 @@ def _get_google_flow():
         'https://www.googleapis.com/auth/classroom.courses.readonly',
         'https://www.googleapis.com/auth/classroom.coursework.students',
         'https://www.googleapis.com/auth/classroom.announcements',
+        'https://www.googleapis.com/auth/classroom.rosters.readonly',
+        'https://www.googleapis.com/auth/classroom.profile.emails',
+        'https://www.googleapis.com/auth/drive.readonly',
         'https://www.googleapis.com/auth/drive.file',       # upload/manage files created by this app
     ]
     return Flow.from_client_config(
@@ -426,5 +429,42 @@ def get_profile_view(request):
         "email": user.email,
         "role": user.role,
         "google_connected": google_connected,
-        "google_email": google_email
+        "google_email": google_email,
+        "date_joined": user.date_joined.isoformat() if user.date_joined else None
     })
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def change_password(request):
+    """
+    Change user password.
+    Requires Authorization Header.
+    Body: { current_password, new_password }
+    """
+    user = get_user_from_request(request)
+    if not user:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+        
+    try:
+        data = json.loads(request.body)
+        current_password = data.get("current_password")
+        new_password = data.get("new_password")
+        
+        if not current_password or not new_password:
+            return JsonResponse({"error": "Both current and new passwords are required."}, status=400)
+            
+        if not check_password(current_password, user.password):
+            return JsonResponse({"error": "Incorrect current password."}, status=400)
+            
+        if len(new_password) < 6:
+            return JsonResponse({"error": "New password must be at least 6 characters."}, status=400)
+            
+        user.password = make_password(new_password)
+        user.save(update_fields=['password'])
+        
+        return JsonResponse({"message": "Password updated successfully."})
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

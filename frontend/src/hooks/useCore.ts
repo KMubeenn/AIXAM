@@ -225,6 +225,15 @@ export const useFetchSubmissionContent = () => {
   });
 };
 
+export const useAIGradeSubmission = () => {
+  return useMutation({
+    mutationFn: ({
+      content, rubric, maxPoints,
+    }: { content: string; rubric: string; maxPoints: number }) =>
+      CoreService.aiGradeSubmission(content, rubric, maxPoints),
+  });
+};
+
 export const usePushGrade = () => {
   return useMutation({
     mutationFn: ({
@@ -237,6 +246,13 @@ export const usePushGrade = () => {
       draftGrade?: number;
     }) =>
       CoreService.pushGradeToClassroom(courseId, courseworkId, submissionId, assignedGrade, draftGrade),
+  });
+};
+
+export const usePostClassroomAnnouncement = () => {
+  return useMutation({
+    mutationFn: ({ courseId, text }: { courseId: string; text: string }) =>
+      CoreService.postClassroomAnnouncement(courseId, text),
   });
 };
 

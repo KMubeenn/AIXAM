@@ -335,7 +335,7 @@ export const CoreService = {
     return response.data;
   },
 
-  async getClassroomCoursework(courseId: string): Promise<{ coursework: { id: string; title: string; maxPoints?: number }[] }> {
+  async getClassroomCoursework(courseId: string): Promise<{ coursework: { id: string; title: string; maxPoints?: number; description?: string }[] }> {
     const response = await api.get(`/core/classroom/courses/${courseId}/coursework/`);
     return response.data;
   },
@@ -355,6 +355,16 @@ export const CoreService = {
       `/core/classroom/courses/${courseId}/coursework/${courseworkId}/submissions/${submissionId}/grade/`,
       { assigned_grade: assignedGrade, ...(draftGrade !== undefined ? { draft_grade: draftGrade } : {}) }
     );
+    return response.data;
+  },
+
+  async postClassroomAnnouncement(courseId: string, text: string): Promise<{ message: string }> {
+    const response = await api.post(`/core/classroom/courses/${courseId}/announcements/`, { text });
+    return response.data;
+  },
+
+  async aiGradeSubmission(content: string, rubric: string, maxPoints: number): Promise<{ score: number; feedback: string }> {
+    const response = await api.post('/core/ai-grade/', { content, rubric, max_points: maxPoints });
     return response.data;
   },
 

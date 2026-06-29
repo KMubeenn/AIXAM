@@ -270,12 +270,16 @@ class ClassroomService:
                 try:
                     if 'driveFile' in attachment:
                         file_id = attachment['driveFile']['id']
-                        file_meta = drive_service.files().get(fileId=file_id, fields='mimeType,name').execute()
+                        file_meta = drive_service.files().get(
+                            fileId=file_id, 
+                            fields='mimeType,name',
+                            supportsAllDrives=True
+                        ).execute()
                         mime = file_meta.get('mimeType', '')
                         name = file_meta.get('name', 'file')
 
-                        if mime == 'application/vnd.google-apps.document':
-                            # Export Google Doc as plain text
+                        if mime in ['application/vnd.google-apps.document', 'application/vnd.google-apps.presentation']:
+                            # Export Google Doc / Slide as plain text
                             response = drive_service.files().export(
                                 fileId=file_id, mimeType='text/plain'
                             ).execute()
@@ -304,6 +308,18 @@ class ClassroomService:
                                     text = '\n'.join(p.text for p in doc.paragraphs)
                                 except Exception:
                                     text = f"[Could not extract text from DOCX: {name}]"
+                            elif 'presentationml' in mime or 'pptx' in mime:
+                                try:
+                                    from pptx import Presentation
+                                    prs = Presentation(buffer)
+                                    text_parts = []
+                                    for slide in prs.slides:
+                                        for shape in slide.shapes:
+                                            if hasattr(shape, "text"):
+                                                text_parts.append(shape.text)
+                                    text = '\n'.join(text_parts)
+                                except Exception:
+                                    text = f"[Could not extract text from PPTX: {name}]"
                             else:
                                 text = f"[Unsupported file type: {mime} — {name}]"
 

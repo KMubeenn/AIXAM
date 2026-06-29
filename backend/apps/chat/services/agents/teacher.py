@@ -119,11 +119,12 @@ class TeacherAgent:
         return SystemMessage(content="You are a helpful teaching assistant.")
 
     def _build_task_messages(self, state: TeacherState, task_prompt: SystemMessage):
-        messages = [state['system_prompt'], task_prompt]
+        messages = [task_prompt]
         if state.get('files_input'):
             messages.append(SystemMessage(content=f"Context from uploaded materials:\n{state['files_input']}"))
         # Add user messages history
         messages.extend(state['messages'])
+        messages.append(SystemMessage(content="Now, please fulfill the request by generating the appropriate content according to your system prompt instructions, without conversational filler."))
         return messages
 
     def entry_router(self, state: TeacherState):
@@ -221,7 +222,7 @@ class TeacherAgent:
         content = result.content
         title = "Teacher_Document"
         doc_writer = DocumentWriter()
-        return {"document": doc_writer.write(content, title, format_type)}
+        return {"document": doc_writer.write(title=title, content=content, format=format_type)}
 
     def _export_as_document(self, source_data, format_type: str, state: TeacherState):
         if not source_data:
@@ -252,13 +253,13 @@ class TeacherAgent:
                 content += "\n"
         elif 'slides' in source_data: # Slides
             for slide in source_data['slides']:
-                content += f"### Slide {slide.get('slide_number')}: {slide.get('title')}\n"
+                content += f"# Slide {slide.get('slide_number')}: {slide.get('title')}\n"
                 for bp in slide.get('bullet_points', []):
                     content += f"- {bp}\n"
                 content += f"**Speaker Notes:** {slide.get('speaker_notes')}\n\n"
                 
         doc_writer = DocumentWriter()
-        return {"document": doc_writer.write(content, title, format_type)}
+        return {"document": doc_writer.write(title=title, content=content, format=format_type)}
 
     def orchestrator(self, state: TeacherState):
         print("[DEBUG TeacherAgent] orchestrator node entered.")

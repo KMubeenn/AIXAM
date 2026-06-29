@@ -3,7 +3,7 @@ Auth URL patterns.
 """
 from django.urls import path
 from apps.users.views import (
-    signup, login, logout, me, get_profile_view,
+    signup, login, logout, me, get_profile_view, change_password,
     google_classroom_login, google_classroom_callback, google_classroom_courses
 )
 
@@ -13,6 +13,7 @@ urlpatterns = [
     path("logout/", logout, name="auth_logout"),
     path("me/", me, name="auth_me"),
     path("profile/", get_profile_view, name="auth_profile"),
+    path("change-password/", change_password, name="auth_change_password"),
     
     # Google Classroom
     path("google/login/", google_classroom_login, name="google_login"),

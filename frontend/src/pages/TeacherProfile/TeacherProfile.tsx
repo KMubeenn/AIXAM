@@ -8,6 +8,8 @@ import { FaGoogle } from "react-icons/fa";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
+import ChangePassword from "../../components/ChangePassword";
+
 const TeacherProfile: React.FC = () => {
   const { data: profile, isLoading: isProfileLoading } = useProfile();
   const { data: analytics } = useTeacherAnalytics();
@@ -61,13 +63,24 @@ const TeacherProfile: React.FC = () => {
                       <LuMail className="w-4 h-4" />
                       <span>{profile?.email}</span>
                     </div>
-                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-400 mt-2">
-                      <LuUser className="w-3 h-3 mr-1" />
-                      Teacher
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-2">
+                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-400">
+                        <LuUser className="w-3 h-3 mr-1" />
+                        Teacher
+                      </div>
+                      {profile?.date_joined && (
+                        <div className="inline-flex items-center text-xs text-gray-500 dark:text-slate-400">
+                          <LuCalendarClock className="w-3 h-3 mr-1" />
+                          Joined: {new Date(profile.date_joined).toLocaleDateString()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Change Password */}
+              <ChangePassword />
 
               {/* Google Classroom Integration */}
               <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">

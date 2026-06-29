@@ -16,7 +16,7 @@ from apps.core.views import (
     get_teacher_quizzes,
     # Teacher — Google Classroom
     list_google_courses_view, list_google_submissions_view,
-    fetch_submission_content_view, patch_grade_view, list_google_coursework_view,
+    fetch_submission_content_view, patch_grade_view, list_google_coursework_view, post_classroom_announcement_view,
     # Teacher — Batch Grades & Report
     get_batch_grades_view, generate_class_report_view, grade_submission_view, post_report_to_classroom_view,
     post_assignment_to_classroom_view,
@@ -75,6 +75,7 @@ urlpatterns = [
     path('classroom/courses/<str:course_id>/coursework/<str:coursework_id>/submissions/', list_google_submissions_view, name='classroom_submissions'),
     path('classroom/courses/<str:course_id>/coursework/<str:coursework_id>/submissions/<str:submission_id>/content/', fetch_submission_content_view, name='submission_content'),
     path('classroom/courses/<str:course_id>/coursework/<str:coursework_id>/submissions/<str:submission_id>/grade/', patch_grade_view, name='patch_grade'),
+    path('classroom/courses/<str:course_id>/announcements/', post_classroom_announcement_view, name='post_classroom_announcement'),
 
     # ── Teacher: Analytics ─────────────────────────────────────────────────
     path('teacher/analytics/', get_teacher_analytics_view, name='teacher_analytics'),

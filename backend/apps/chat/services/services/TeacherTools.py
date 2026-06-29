@@ -34,13 +34,14 @@ class TeacherTools():
         Rules:
         - Steps execute in order.
         - If the user wants content exported as a document (e.g. "give me the assignment in PDF"), create the content step first, then a document step that depends on it.
+        - If the user wants to generate a document from arbitrary text, chat history, or an uploaded document (e.g. "generate my resume as a PDF"), schedule ONLY the `generate_pdf` (or `generate_docx`) task with `depends_on: null`.
         - If tasks are independent, set depends_on to null for both.
         - For a single simple task, return a list with one step.
 
         Examples:
         - "Create an assignment on databases" -> [{"step": 1, "task": "assignment", "depends_on": null}]
         - "Quiz on ML and export as PDF" -> [{"step": 1, "task": "teacher_quiz", "depends_on": null}, {"step": 2, "task": "generate_pdf", "depends_on": 1}]
-        - "Create slides on neural networks as PPTX" -> [{"step": 1, "task": "slide_outline", "depends_on": null}, {"step": 2, "task": "generate_pptx", "depends_on": 1}]
+        - "Turn my resume into a PDF" -> [{"step": 1, "task": "generate_pdf", "depends_on": null}]
         """
         serialized_steps = [step.dict() for step in steps]
         return json.dumps(serialized_steps)

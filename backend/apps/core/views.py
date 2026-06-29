@@ -919,3 +919,29 @@ async def post_quiz_to_classroom_view(request, quiz_id):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def post_classroom_announcement_view(request, course_id):
+    """
+    Post an announcement to the Google Classroom course stream.
+    Body: { "text": "Announcement content..." }
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'teacher':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+        import json
+        body = json.loads(request.body) if request.body else {}
+        text = body.get('text', '')
+        if not text:
+            return JsonResponse({'error': 'Text is required'}, status=400)
+            
+        from apps.chat.services.utilities.ClassroomService import ClassroomService
+        await sync_to_async(ClassroomService.post_announcement)(user, course_id, text)
+        return JsonResponse({'message': 'Announcement posted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+

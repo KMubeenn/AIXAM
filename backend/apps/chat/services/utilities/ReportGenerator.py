@@ -5,50 +5,29 @@ Returns the report as a base64-encoded string (no disk writes).
 import io
 import base64
 from datetime import datetime
+from fpdf import FPDF
 
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font('Helvetica', 'B', 18)
+        self.set_text_color(30, 41, 59) # #1e293b
+        self.cell(0, 10, 'Class Performance Report', 0, 1, 'L')
+        self.ln(5)
+
+    def chapter_title(self, title):
+        self.set_font('Helvetica', 'B', 13)
+        self.set_text_color(67, 56, 202) # #4338ca
+        self.cell(0, 10, title, 0, 1, 'L')
+        self.ln(2)
 
 def generate_class_report_pdf(assignment_title: str, grades_data: dict) -> dict:
-    """
-    Generate a PDF class performance report from batch grading results.
-
-    Args:
-        assignment_title: Title of the graded assignment.
-        grades_data: Dict matching BatchGradingResult schema:
-            {
-                "grades": [
-                    {"student_name": str, "marks": float, "max_marks": float, "feedback": str, ...}
-                ],
-                "total_marks": float,
-                "max_total_marks": float,
-                "overall_feedback": str,
-                "class_average": float
-            }
-
-    Returns:
-        {
-            "filename": str,
-            "mime_type": "application/pdf",
-            "file_base64": str (base64-encoded PDF bytes)
-        }
-    """
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-        )
-    except ImportError:
-        raise ImportError("reportlab is required for PDF generation. Install it with: pip install reportlab")
-
     grades = grades_data.get('grades', [])
     class_average = grades_data.get('class_average', 0.0)
     overall_feedback = grades_data.get('overall_feedback', '')
     max_total = grades_data.get('max_total_marks', 100.0)
 
     # ── Score distribution buckets ──────────────────────────────────────────
-    buckets = {'Excellent (≥90%)': 0, 'Good (75–89%)': 0, 'Average (50–74%)': 0, 'Below Average (<50%)': 0}
+    buckets = {'Excellent (>=90%)': 0, 'Good (75-89%)': 0, 'Average (50-74%)': 0, 'Below Average (<50%)': 0}
     student_summaries = {}
     for g in grades:
         name = g.get('student_name', 'Unknown')
@@ -65,114 +44,81 @@ def generate_class_report_pdf(assignment_title: str, grades_data: dict) -> dict:
         info['pct'] = round(pct, 1)
         student_pcts.append((name, info['total'], pct, info['feedback']))
         if pct >= 90:
-            buckets['Excellent (≥90%)'] += 1
+            buckets['Excellent (>=90%)'] += 1
         elif pct >= 75:
-            buckets['Good (75–89%)'] += 1
+            buckets['Good (75-89%)'] += 1
         elif pct >= 50:
-            buckets['Average (50–74%)'] += 1
+            buckets['Average (50-74%)'] += 1
         else:
             buckets['Below Average (<50%)'] += 1
 
-    # Sort: lowest scorers first (for flagging struggling students)
     student_pcts.sort(key=lambda x: x[2])
     struggling = [name for name, _, pct, _ in student_pcts if pct < 50]
 
     # ── Build PDF ────────────────────────────────────────────────────────────
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=2*cm, leftMargin=2*cm,
-        topMargin=2*cm, bottomMargin=2*cm
-    )
+    pdf = PDFReport()
+    pdf.add_page()
+    
+    # Subheader
+    pdf.set_font('Helvetica', '', 11)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 8, f"Assignment: {assignment_title}", 0, 1, 'L')
+    pdf.cell(0, 8, f"Generated: {datetime.now().strftime('%B %d, %Y at %H:%M')}", 0, 1, 'L')
+    pdf.ln(5)
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=18, spaceAfter=6, textColor=colors.HexColor('#1e293b'))
-    h2_style = ParagraphStyle('H2', parent=styles['Heading2'], fontSize=13, spaceBefore=16, spaceAfter=6, textColor=colors.HexColor('#4338ca'))
-    normal = styles['Normal']
-    small = ParagraphStyle('Small', parent=normal, fontSize=9, textColor=colors.HexColor('#64748b'))
+    # Summary Stats
+    pdf.chapter_title("Summary Statistics")
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(80, 8, 'Total Students Graded:', 0, 0)
+    pdf.cell(0, 8, str(len(student_summaries)), 0, 1)
+    pdf.cell(80, 8, 'Class Average:', 0, 0)
+    pdf.cell(0, 8, f"{round(class_average, 1)}%", 0, 1)
+    pdf.cell(80, 8, 'Max Marks per Assignment:', 0, 0)
+    pdf.cell(0, 8, str(max_total), 0, 1)
+    pdf.cell(80, 8, 'Struggling Students (<50%):', 0, 0)
+    pdf.cell(0, 8, str(len(struggling)), 0, 1)
+    pdf.ln(5)
 
-    story = []
-
-    # Header
-    story.append(Paragraph(f"Class Performance Report", title_style))
-    story.append(Paragraph(f"Assignment: <b>{assignment_title}</b>", normal))
-    story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %H:%M')}", small))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e2e8f0'), spaceAfter=12))
-
-    # Summary stats
-    story.append(Paragraph("Summary Statistics", h2_style))
-    summary_data = [
-        ['Metric', 'Value'],
-        ['Total Students Graded', str(len(student_summaries))],
-        ['Class Average', f"{round(class_average, 1)}%"],
-        ['Max Marks per Assignment', str(max_total)],
-        ['Struggling Students (<50%)', str(len(struggling))],
-    ]
-    summary_table = Table(summary_data, colWidths=[10*cm, 6*cm])
-    summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4338ca')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f8fafc'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-        ('PADDING', (0, 0), (-1, -1), 8),
-    ]))
-    story.append(summary_table)
-    story.append(Spacer(1, 12))
-
-    # Score distribution
-    story.append(Paragraph("Score Distribution", h2_style))
-    dist_data = [['Performance Band', 'Number of Students']] + [[band, str(count)] for band, count in buckets.items()]
-    dist_table = Table(dist_data, colWidths=[10*cm, 6*cm])
-    dist_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f0fdf4'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-        ('PADDING', (0, 0), (-1, -1), 8),
-    ]))
-    story.append(dist_table)
-    story.append(Spacer(1, 12))
+    # Score Distribution
+    pdf.chapter_title("Score Distribution")
+    for band, count in buckets.items():
+        pdf.cell(80, 8, band, 0, 0)
+        pdf.cell(0, 8, str(count), 0, 1)
+    pdf.ln(5)
 
     # Per-student breakdown
-    story.append(Paragraph("Student Score Breakdown", h2_style))
-    student_data = [['Student Name', 'Total Marks', 'Score %', 'Status']]
+    pdf.chapter_title("Student Score Breakdown")
+    pdf.set_font('Helvetica', 'B', 10)
+    pdf.cell(70, 8, 'Student Name', border=1)
+    pdf.cell(30, 8, 'Marks', border=1)
+    pdf.cell(30, 8, 'Score %', border=1)
+    pdf.cell(40, 8, 'Status', border=1, ln=1)
+    
+    pdf.set_font('Helvetica', '', 10)
     for name, total, pct, _ in sorted(student_pcts, key=lambda x: -x[2]):
-        status = '✓ Pass' if pct >= 50 else '✗ Fail'
-        student_data.append([name, f"{round(total, 1)}/{max_total}", f"{round(pct, 1)}%", status])
-
-    student_table = Table(student_data, colWidths=[6*cm, 4*cm, 3*cm, 3*cm])
-    student_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e293b')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f8fafc'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-        ('PADDING', (0, 0), (-1, -1), 7),
-    ]))
-    story.append(student_table)
-    story.append(Spacer(1, 12))
+        status = 'Pass' if pct >= 50 else 'Fail'
+        pdf.cell(70, 8, str(name)[:30], border=1)
+        pdf.cell(30, 8, f"{round(total, 1)}/{max_total}", border=1)
+        pdf.cell(30, 8, f"{round(pct, 1)}%", border=1)
+        pdf.cell(40, 8, status, border=1, ln=1)
+    pdf.ln(5)
 
     # Struggling students
     if struggling:
-        story.append(Paragraph("⚠ Students Requiring Attention (<50%)", h2_style))
+        pdf.chapter_title("Students Requiring Attention (<50%)")
+        pdf.set_font('Helvetica', '', 10)
         for name in struggling:
-            story.append(Paragraph(f"• {name}", normal))
-        story.append(Spacer(1, 8))
+            pdf.cell(0, 8, f"- {name}", 0, 1)
+        pdf.ln(5)
 
     # Overall feedback
     if overall_feedback:
-        story.append(Paragraph("Overall Class Feedback", h2_style))
-        story.append(Paragraph(overall_feedback, normal))
+        pdf.chapter_title("Overall Class Feedback")
+        pdf.set_font('Helvetica', '', 10)
+        pdf.multi_cell(0, 8, str(overall_feedback))
 
-    doc.build(story)
-    buffer.seek(0)
-    pdf_bytes = buffer.read()
+    pdf_bytes = pdf.output(dest='S')
     b64 = base64.b64encode(pdf_bytes).decode('utf-8')
 
     safe_title = "".join(c if c.isalnum() or c in (' ', '-') else '_' for c in assignment_title)
