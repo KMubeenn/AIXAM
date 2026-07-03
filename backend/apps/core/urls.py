@@ -25,6 +25,8 @@ from apps.core.views import (
     update_question_view,
     # Teacher — Analytics
     get_teacher_analytics_view,
+    # Student — Analytics
+    get_student_analytics_view, get_student_insights_view,
 )
 
 urlpatterns = [
@@ -79,4 +81,8 @@ urlpatterns = [
 
     # ── Teacher: Analytics ─────────────────────────────────────────────────
     path('teacher/analytics/', get_teacher_analytics_view, name='teacher_analytics'),
+
+    # ── Student: Analytics ─────────────────────────────────────────────────
+    path('analytics/student/', get_student_analytics_view, name='student_analytics'),
+    path('analytics/insights/', get_student_insights_view, name='student_insights'),
 ]

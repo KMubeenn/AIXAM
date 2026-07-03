@@ -8,6 +8,7 @@ export interface UserProfile {
   role: "student" | "teacher" | "admin";
   google_connected: boolean;
   google_email: string | null;
+  date_joined?: string;
 }
 
 export const useProfile = () => {

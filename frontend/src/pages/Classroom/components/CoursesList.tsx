@@ -855,27 +855,37 @@ const CoursesList: React.FC = () => {
               {selectedCourse.name}
             </span>
           </h3>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+          <div className="mb-4">
             {cwLoading ? (
-              <div className="flex-1 h-11 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[1, 2, 3].map(i => <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />)}
+              </div>
             ) : courseworks.length > 0 ? (
-              <select
-                value={courseworkId}
-                onChange={(e) => {
-                  setCourseworkId(e.target.value);
-                  setCwInput(e.target.value);
-                }}
-                className="flex-1 h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-              >
-                <option value="">-- Select Coursework --</option>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {courseworks.map((cw: any) => (
-                  <option key={cw.id} value={cw.id}>
-                    {cw.title}
-                  </option>
+                  <button
+                    key={cw.id}
+                    onClick={() => {
+                      setCourseworkId(cw.id);
+                      setCwInput(cw.id);
+                    }}
+                    className={`text-left p-4 rounded-xl border-2 transition-all ${
+                      courseworkId === cw.id
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                        : "border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600"
+                    }`}
+                  >
+                    <h4 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-1">
+                      {cw.title}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                      Marks: <span className="font-semibold">{cw.maxPoints || "Ungraded"}</span>
+                    </p>
+                  </button>
                 ))}
-              </select>
+              </div>
             ) : (
-              <>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <input
                   type="text"
                   placeholder="Enter Coursework ID from Google Classroom"
@@ -890,7 +900,7 @@ const CoursesList: React.FC = () => {
                 >
                   Load
                 </button>
-              </>
+              </div>
             )}
           </div>
           {courseworkId && (

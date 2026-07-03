@@ -417,13 +417,40 @@ export const CoreService = {
     quiz_count: number;
     total_submissions: number;
     class_average: number;
+    student_count: number;
     strongest_topic: string;
     strongest_avg: number;
     weakest_topic: string;
     weakest_avg: number;
+    score_distribution: Record<string, number>;
+    per_assignment: { title: string; avg_score: number; count: number }[];
     topics: { topic: string; avg_score: number; student_count: number }[];
   }> {
     const response = await api.get('/core/teacher/analytics/');
     return response.data;
   },
+
+  // ── Student: Analytics ───────────────────────
+  async getStudentAnalytics(): Promise<{
+    overall_avg: number;
+    total_tests: number;
+    strongest_topic: string;
+    strongest_score: number;
+    weakest_topic: string;
+    weakest_score: number;
+    score_timeline: { title: string; score: number; date: string }[];
+    topics: { topic: string; strength_score: number; tests_taken: number }[];
+  }> {
+    const response = await api.get('/core/analytics/student/');
+    return response.data;
+  },
+
+  async generateStudentInsights(): Promise<{
+    subjects: { name: string; avg_score: number; topics: string[] }[];
+    insights: { type: string; title: string; message: string }[];
+  }> {
+    const response = await api.post('/core/analytics/insights/');
+    return response.data;
+  },
 };
+

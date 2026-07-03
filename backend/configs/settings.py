@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django.contrib.contenttypes",
     "django.contrib.auth",
+    "django.contrib.sessions",
     "apps.users",     # User management
     "apps.chat",      # Chat and Voice agents
     "apps.analytics", # Metrics and usage
@@ -52,6 +53,7 @@ ASGI_APPLICATION = "configs.asgi.application"
 # Middleware
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "apps.core.middleware.metrics.RequestMetricsMiddleware",
 ]
 
@@ -68,4 +70,7 @@ TIME_ZONE = "UTC"
 CORS_ALLOW_CREDENTIALS = True
 CORS_EXPOSE_HEADERS = ["X-Session-Id"]
 
-
+# Sessions (used for caching LLM responses like student insights)
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_SAVE_EVERY_REQUEST = False

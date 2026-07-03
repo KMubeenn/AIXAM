@@ -10,13 +10,13 @@ from fpdf import FPDF
 class PDFReport(FPDF):
     def header(self):
         self.set_font('Helvetica', 'B', 18)
-        self.set_text_color(30, 41, 59) # #1e293b
+        self.set_text_color(0, 0, 0) # Black
         self.cell(0, 10, 'Class Performance Report', 0, 1, 'L')
         self.ln(5)
 
     def chapter_title(self, title):
-        self.set_font('Helvetica', 'B', 13)
-        self.set_text_color(67, 56, 202) # #4338ca
+        self.set_font('Helvetica', 'B', 14)
+        self.set_text_color(0, 0, 0) # Black
         self.cell(0, 10, title, 0, 1, 'L')
         self.ln(2)
 

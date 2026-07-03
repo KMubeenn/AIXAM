@@ -17,10 +17,7 @@ import json
 @require_http_methods(['GET'])
 async def get_teacher_analytics_view(request):
     """
-    Return real analytics data for the teacher dashboard:
-    - Total assignments, quizzes, submissions
-    - Class average score
-    - Top and bottom performing topics (derived from StudentPerformance)
+    Return real analytics data for the teacher dashboard.
     """
     try:
         user = await sync_to_async(get_user_from_request)(request=request)
@@ -30,7 +27,6 @@ async def get_teacher_analytics_view(request):
         from apps.core.models import Assignment, Quiz, Submission, StudentPerformance
         from django.db.models import Avg, Count
 
-        # Assignments & quizzes created by this teacher
         assignment_count = await sync_to_async(
             lambda: Assignment.objects.filter(created_by_id=user.id).count()
         )()
@@ -38,29 +34,34 @@ async def get_teacher_analytics_view(request):
             lambda: Quiz.objects.filter(created_by_id=user.id, quiz_type='assignment_quiz').count()
         )()
 
-        # Submissions for assignments this teacher created
         teacher_assignment_ids = await sync_to_async(
             lambda: list(Assignment.objects.filter(created_by_id=user.id).values_list('id', flat=True))
         )()
 
         submission_stats = await sync_to_async(
-            lambda: Submission.objects.filter(
-                assignment_id__in=teacher_assignment_ids
-            ).aggregate(total=Count('id'), avg=Avg('score'))
+            lambda: list(Submission.objects.filter(
+                assignment_id__in=teacher_assignment_ids, score__isnull=False
+            ).values('score', 'assignment__total_marks'))
         )()
 
-        total_submissions = submission_stats.get('total') or 0
-        class_avg = round(submission_stats.get('avg') or 0, 1)
+        total_submissions = len(submission_stats)
+        normalized_scores = []
+        for stat in submission_stats:
+            raw_score = stat['score']
+            total = stat['assignment__total_marks']
+            if total and total > 0:
+                normalized_scores.append((raw_score / total) * 100)
+            else:
+                normalized_scores.append(raw_score) # fallback if total_marks is 0 or null
 
-        # Top topics from StudentPerformance for students in this class
-        # Step 1: Get student IDs who submitted to this teacher's assignments
+        class_avg = round(sum(normalized_scores) / len(normalized_scores), 1) if normalized_scores else 0
+
         student_ids = await sync_to_async(
             lambda: list(Submission.objects.filter(
                 assignment_id__in=teacher_assignment_ids
             ).values_list('student_id', flat=True).distinct())
         )()
 
-        # Step 2: Get performance only for those students
         if student_ids:
             topic_data = await sync_to_async(
                 lambda: list(
@@ -78,23 +79,189 @@ async def get_teacher_analytics_view(request):
         strongest_avg = round(topic_data[0]['avg_score'], 1) if topic_data else 0
         weakest_avg = round(topic_data[-1]['avg_score'], 1) if len(topic_data) > 1 else 0
 
+        # Score distribution buckets (Normalized)
+        distribution = {'90-100': 0, '75-89': 0, '50-74': 0, '0-49': 0}
+        for s in normalized_scores:
+            if s >= 90: distribution['90-100'] += 1
+            elif s >= 75: distribution['75-89'] += 1
+            elif s >= 50: distribution['50-74'] += 1
+            else: distribution['0-49'] += 1
+
+        # Per-assignment stats (Normalized)
+        per_assignment_raw = await sync_to_async(
+            lambda: list(
+                Submission.objects.filter(assignment_id__in=teacher_assignment_ids, score__isnull=False)
+                .values('assignment__title', 'assignment__total_marks')
+                .annotate(raw_avg=Avg('score'), count=Count('id'))
+                .order_by('-count')[:8]
+            )
+        )()
+        
+        per_assignment = []
+        for p in per_assignment_raw:
+            total = p['assignment__total_marks']
+            avg_score = (p['raw_avg'] / total * 100) if (total and total > 0) else p['raw_avg']
+            per_assignment.append({
+                'title': p['assignment__title'],
+                'avg_score': round(avg_score, 1),
+                'count': p['count']
+            })
+
         return JsonResponse({
             'assignment_count': assignment_count,
             'quiz_count': quiz_count,
             'total_submissions': total_submissions,
             'class_average': class_avg,
+            'student_count': len(student_ids),
             'strongest_topic': strongest,
             'strongest_avg': strongest_avg,
             'weakest_topic': weakest,
             'weakest_avg': weakest_avg,
-            'topics': [{
-                'topic': t['topic'],
-                'avg_score': round(t['avg_score'], 1),
-                'student_count': t['count']
-            } for t in topic_data]
+            'score_distribution': distribution,
+            'per_assignment': per_assignment,
+            'topics': [{'topic': t['topic'], 'avg_score': round(t['avg_score'], 1), 'student_count': t['count']} for t in topic_data]
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+async def get_student_analytics_view(request):
+    """
+    Returns aggregated student analytics: overall avg, score timeline, topic list.
+    No LLM call — fast data-only endpoint.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'student':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        from apps.core.models import Submission, StudentPerformance
+        from django.db.models import Avg
+
+        # Last 12 submissions for timeline
+        submissions = await sync_to_async(
+            lambda: list(
+                Submission.objects.filter(student_id=user.id, score__isnull=False)
+                .select_related('quiz', 'assignment')
+                .order_by('submitted_at')[:12]
+            )
+        )()
+
+        timeline = []
+        for s in submissions:
+            title = (s.assignment.title if s.assignment else None) or (s.quiz.title if s.quiz else 'Test')
+            
+            score = s.score
+            if s.assignment and s.assignment.total_marks and s.assignment.total_marks > 0:
+                score = (score / s.assignment.total_marks) * 100
+                
+            timeline.append({'title': title[:30], 'score': round(score, 1), 'date': s.submitted_at.strftime('%b %d')})
+
+        overall_avg = round(sum(t['score'] for t in timeline) / len(timeline), 1) if timeline else 0
+        total_tests = len(timeline)
+
+        # Topic performance
+        topics = await sync_to_async(
+            lambda: list(StudentPerformance.objects.filter(student_id=user.id).order_by('-strength_score'))
+        )()
+
+        strongest = topics[0] if topics else None
+        weakest = topics[-1] if len(topics) > 1 else None
+
+        return JsonResponse({
+            'overall_avg': overall_avg,
+            'total_tests': total_tests,
+            'strongest_topic': strongest.topic if strongest else 'N/A',
+            'strongest_score': round(strongest.strength_score, 1) if strongest else 0,
+            'weakest_topic': weakest.topic if weakest else 'N/A',
+            'weakest_score': round(weakest.strength_score, 1) if weakest else 0,
+            'score_timeline': timeline,
+            'topics': [
+                {'topic': t.topic, 'strength_score': round(t.strength_score, 1), 'tests_taken': t.tests_taken}
+                for t in topics
+            ],
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+async def get_student_insights_view(request):
+    """
+    LLM-powered: groups topics into subjects and generates personalized insights.
+    Cached in django.core.cache for 15 minutes.
+    Called on-demand via Generate Insights button.
+    """
+    try:
+        user = await sync_to_async(get_user_from_request)(request=request)
+        if not user or user.role != 'student':
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        from django.core.cache import cache
+        cache_key = f'student_insights_{user.id}'
+        cached = cache.get(cache_key)
+        if cached:
+            return JsonResponse(cached)
+
+        from apps.core.models import StudentPerformance
+        topics_qs = await sync_to_async(
+            lambda: list(StudentPerformance.objects.filter(student_id=user.id))
+        )()
+
+        if not topics_qs:
+            return JsonResponse({'subjects': [], 'insights': []})
+
+        # Build topic summary for LLM
+        topic_lines = [f"- {t.topic}: {round(t.strength_score, 1)}%" for t in topics_qs]
+        topic_summary = "\n".join(topic_lines)
+
+        prompt = f"""You are an academic analytics assistant. A student has the following topic performance scores:
+{topic_summary}
+
+Do two things and return ONLY valid JSON with no markdown or code fences:
+1. Group these topics into broad academic subjects (e.g. "Artificial Intelligence", "Mathematics", "Geography"). Average the scores per subject.
+2. Generate exactly 3 short personalized insights based on the data (one strength, one weakness, one study tip).
+
+Return this exact JSON structure:
+{{
+  "subjects": [
+    {{"name": "Subject Name", "avg_score": 85.0, "topics": ["topic1", "topic2"]}}
+  ],
+  "insights": [
+    {{"type": "strength", "title": "Keep It Up!", "message": "Short personalized message."}},
+    {{"type": "weakness", "title": "Focus Area", "message": "Short personalized message."}},
+    {{"type": "tip", "title": "Study Tip", "message": "Short personalized message."}}
+  ]
+}}"""
+
+        from langchain.chat_models import init_chat_model
+        import os, json as json_lib
+        llm = init_chat_model(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            model_provider="google_genai",
+            api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=0.3,
+        )
+        response = await llm.ainvoke(prompt)
+        raw = response.content.strip()
+        
+        # Robust JSON extraction
+        start_idx = raw.find('{')
+        end_idx = raw.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            raw = raw[start_idx:end_idx+1]
+            
+        result = json_lib.loads(raw.strip())
+
+        # Cache in memory for 15 minutes to avoid stale data while preventing spam
+        cache.set(cache_key, result, timeout=900)
+        return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 @require_http_methods(['GET'])

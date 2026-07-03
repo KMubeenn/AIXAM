@@ -334,3 +334,18 @@ export const useTeacherAnalytics = () => {
     queryFn: () => CoreService.getTeacherAnalytics(),
   });
 };
+
+// ── Student: Analytics ────────────────────────────────────────────────────────
+
+export const useStudentAnalytics = () => {
+  return useQuery({
+    queryKey: ['student-analytics'],
+    queryFn: () => CoreService.getStudentAnalytics(),
+  });
+};
+
+export const useGenerateInsights = () => {
+  return useMutation({
+    mutationFn: () => CoreService.generateStudentInsights(),
+  });
+};
