@@ -3,6 +3,7 @@ import { LuFlaskConical, LuSquareCheck, LuTrash2 } from "react-icons/lu";
 import { useQuizzes, useDeleteQuiz } from "../../../hooks/useCore";
 import QuizTakerModal from "./QuizTakerModal";
 import SubmissionsHistory from "./SubmissionsHistory";
+import GenerateMockTestModal from "./GenerateMockTestModal";
 
 interface MockTestsProps {
   initialQuizId?: string | null;
@@ -14,6 +15,7 @@ const MockTests: React.FC<MockTestsProps> = ({ initialQuizId }) => {
   const quizzes = data?.quizzes ?? [];
 
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
   // Auto-open quiz if deep-linked from Chat
   useEffect(() => {
@@ -50,6 +52,8 @@ const MockTests: React.FC<MockTestsProps> = ({ initialQuizId }) => {
 
   return (
     <>
+      <GenerateMockTestModal isOpen={isGenerateModalOpen} onClose={() => setIsGenerateModalOpen(false)} />
+
       {activeQuizId && (
         <QuizTakerModal quizId={activeQuizId} onClose={() => setActiveQuizId(null)} />
       )}
@@ -62,6 +66,12 @@ const MockTests: React.FC<MockTestsProps> = ({ initialQuizId }) => {
               {isLoading ? "Loading..." : `${quizzes.length} test${quizzes.length !== 1 ? "s" : ""} available`}
             </p>
           </div>
+          <button 
+            onClick={() => setIsGenerateModalOpen(true)}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          >
+            Generate New Test
+          </button>
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">

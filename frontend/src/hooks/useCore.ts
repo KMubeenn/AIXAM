@@ -92,6 +92,16 @@ export const useMaterials = () => {
   });
 };
 
+export const useUploadMaterial = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (files: File[]) => CoreService.uploadMaterials(files),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+    },
+  });
+};
+
 export const useDeleteMaterial = () => {
   const queryClient = useQueryClient();
   return useMutation({

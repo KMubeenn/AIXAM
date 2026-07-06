@@ -3,6 +3,8 @@ import { FiX, FiCheckCircle, FiAlertCircle, FiClock, FiMessageSquare } from "rea
 import { useNavigate } from "react-router-dom";
 import { useQuizDetail, useSubmitQuiz } from "../../../hooks/useCore";
 import { QuizQuestion } from "../../../services/core.service";
+import { ChatService } from "../../../services/chat.service";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface QuizTakerModalProps {
   quizId: string;
@@ -21,6 +23,9 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
   const [descAnswers, setDescAnswers] = useState<DescAnswers>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState<{ correct: number; total: number } | null>(null);
+  const [descriptiveResult, setDescriptiveResult] = useState<any | null>(null);
+  const [isGrading, setIsGrading] = useState(false);
+  const queryClient = useQueryClient();
 
   const mcqQuestions = quiz?.questions?.filter((q) => q.question_type === "mcq") ?? [];
   const descriptiveQuestions = quiz?.questions?.filter((q) => q.question_type === "descriptive") ?? [];
@@ -71,27 +76,46 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
     }
   };
 
-  // ── Descriptive: send to AI chat for grading ──────────────────────────────
-  const handleSendToChat = () => {
+  // ── Descriptive: grade inline using ChatService ───────────────────────────
+  const handleDescriptiveGrade = async () => {
     if (!quiz) return;
     const submission = descriptiveQuestions.map((q) => ({
       question_id: q.id,
       question: q.text,
       answer: descAnswers[q.id] ?? "",
+      max_marks: q.points,
     }));
-    // Navigate to chat with grading request encoded in state
-    navigate("/chat", {
-      state: {
-        gradeRequest: {
-          quiz_id: quiz.id,
-          quiz_title: quiz.title,
+    
+    setIsGrading(true);
+    let gradedResult: any = null;
+    try {
+      await ChatService.sendMessageStream(
+        {
+          message: `Please grade these answers for the test "${quiz.title}" and provide detailed feedback and a score out of 100.`,
           grade_test: true,
           test_submission: submission,
-          grading_instructions: `Please grade these answers for the test "${quiz.title}" and provide detailed feedback and a score out of 100.`,
+          quiz_id: quiz.id,
+          create_session: true,
         },
-      },
-    });
-    onClose();
+        () => {},
+        (structuredData) => {
+          if (structuredData.type === 'mock_test_grades') {
+            gradedResult = structuredData.data;
+          }
+        },
+        () => {}
+      );
+      
+      if (gradedResult) {
+        setDescriptiveResult(gradedResult);
+        setSubmitted(true);
+        queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      }
+    } catch (e: any) {
+      alert("Grading failed: " + e.message);
+    } finally {
+      setIsGrading(false);
+    }
   };
 
   const isChoiceCorrect = (q: QuizQuestion, choiceId: string) =>
@@ -109,10 +133,7 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
             </h2>
             {!isLoading && quiz && (
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-xs text-gray-400 dark:text-slate-500 flex items-center gap-1">
-                  <FiClock className="w-3 h-3" />
-                  {quiz.time_limit_minutes} min
-                </span>
+
                 <span className="text-xs text-gray-400 dark:text-slate-500">
                   {quiz.questions?.length ?? 0} questions
                 </span>
@@ -219,6 +240,51 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
                 })}
               </div>
             </div>
+          ) : submitted && descriptiveResult ? (
+            /* ── Descriptive Results screen ── */
+            <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
+              <div
+                className={`w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold ${
+                  (descriptiveResult.total_marks / descriptiveResult.max_total_marks) >= 0.7
+                    ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600"
+                    : "bg-amber-100 dark:bg-amber-900/30 text-amber-600"
+                }`}
+              >
+                {descriptiveResult.max_total_marks > 0 ? Math.round((descriptiveResult.total_marks / descriptiveResult.max_total_marks) * 100) : 0}%
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {descriptiveResult.total_marks >= Math.ceil(descriptiveResult.max_total_marks * 0.7) ? "Well done!" : "Keep practising!"}
+                </h3>
+                <p className="text-gray-500 dark:text-slate-400 mt-1">
+                  You got{" "}
+                  <span className="font-bold text-gray-800 dark:text-white">
+                    {descriptiveResult.total_marks} out of {descriptiveResult.max_total_marks}
+                  </span>{" "}
+                  marks.
+                </p>
+                <p className="text-gray-600 dark:text-slate-300 mt-3 text-sm italic max-w-xl mx-auto">
+                  "{descriptiveResult.overall_feedback}"
+                </p>
+              </div>
+              {/* Answer review */}
+              <div className="w-full mt-6 space-y-4 text-left">
+                <h4 className="font-semibold text-gray-700 dark:text-slate-300">Detailed Feedback</h4>
+                {descriptiveResult.grades?.map((g: any, i: number) => (
+                  <div key={i} className="rounded-xl border p-4 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">
+                    <p className="text-sm font-bold text-gray-800 dark:text-white mb-2">Q{i + 1}. {g.question}</p>
+                    <p className="text-sm text-gray-600 dark:text-slate-300 mb-2 whitespace-pre-wrap"><span className="font-semibold text-gray-700 dark:text-slate-400">Your Answer:</span><br/>{g.student_answer || "(no answer provided)"}</p>
+                    <div className="mt-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/50">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">AI Feedback</span>
+                        <span className="text-xs font-bold bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">{g.marks} / {g.max_marks} marks</span>
+                      </div>
+                      <p className="text-sm text-indigo-900 dark:text-indigo-200 whitespace-pre-wrap">{g.feedback}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <>
               {/* ── MCQ Questions ── */}
@@ -286,7 +352,7 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
                     <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
                       <FiMessageSquare className="w-4 h-4 text-amber-500 flex-shrink-0" />
                       <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Write your answers below. When ready, click <strong>Send to AI for Grading</strong> — the AI will review your answers and give you a personalised score and feedback in the chat.
+                        Write your answers below. When ready, click <strong>Grade Written Answers</strong> — the AI will review your answers right here and give you a personalised score and feedback.
                       </p>
                     </div>
                   )}
@@ -362,19 +428,19 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
                       {submitQuiz.isPending ? "Submitting..." : "Submit MCQ"}
                     </button>
                   )}
-                  {/* Descriptive: send to AI */}
+                  {/* Descriptive: grade inline */}
                   {totalDesc > 0 && (
                     <button
-                      onClick={handleSendToChat}
-                      disabled={!canSubmitDesc}
+                      onClick={handleDescriptiveGrade}
+                      disabled={!canSubmitDesc || isGrading}
                       className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                        canSubmitDesc
+                        canSubmitDesc && !isGrading
                           ? "bg-amber-500 text-white hover:bg-amber-600 shadow-md"
                           : "bg-gray-200 dark:bg-slate-800 text-gray-400 cursor-not-allowed"
                       }`}
                     >
                       <FiMessageSquare className="w-4 h-4" />
-                      Send to AI for Grading
+                      {isGrading ? "Grading..." : "Grade Written Answers"}
                     </button>
                   )}
                 </div>

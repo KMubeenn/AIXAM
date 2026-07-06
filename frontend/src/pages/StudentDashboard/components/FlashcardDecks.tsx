@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { LuLayers, LuTrash2, LuBookOpen } from "react-icons/lu";
 import { useFlashcardSets, useDeleteFlashcardSet } from "../../../hooks/useCore";
 import FlashcardStudyModal from "./FlashcardStudyModal";
+import GenerateFlashcardsModal from "./GenerateFlashcardsModal";
 
 const DECK_COLORS = [
   { bar: "bg-indigo-500", badge: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300" },
@@ -22,6 +23,7 @@ const FlashcardDecks: React.FC<FlashcardDecksProps> = ({ initialSetId }) => {
   const sets = data?.flashcard_sets ?? [];
 
   const [studySetId, setStudySetId] = useState<string | null>(null);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
   // Auto-open set if deep-linked from Chat
   useEffect(() => {
@@ -39,6 +41,8 @@ const FlashcardDecks: React.FC<FlashcardDecksProps> = ({ initialSetId }) => {
 
   return (
     <>
+      <GenerateFlashcardsModal isOpen={isGenerateModalOpen} onClose={() => setIsGenerateModalOpen(false)} />
+
       {studySetId && (
         <FlashcardStudyModal setId={studySetId} onClose={() => setStudySetId(null)} />
       )}
@@ -51,6 +55,12 @@ const FlashcardDecks: React.FC<FlashcardDecksProps> = ({ initialSetId }) => {
               {isLoading ? "Loading..." : `${sets.length} deck${sets.length !== 1 ? "s" : ""} available`}
             </p>
           </div>
+          <button 
+            onClick={() => setIsGenerateModalOpen(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          >
+            Generate New Deck
+          </button>
         </div>
 
         {isLoading ? (

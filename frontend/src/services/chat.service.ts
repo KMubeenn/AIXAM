@@ -10,6 +10,7 @@ export interface ChatRequest {
   grading_instructions?: string;
   files?: File[];
   study_material_id?: string;
+  direct_task?: string;
 }
 
 export interface ChatMessage {

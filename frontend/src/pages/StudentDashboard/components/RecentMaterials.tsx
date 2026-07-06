@@ -7,16 +7,18 @@ import {
   LuPlus,
   LuTrash2,
 } from "react-icons/lu";
-import { useMaterials, useDeleteMaterial } from "../../../hooks/useCore";
+import { useMaterials, useDeleteMaterial, useUploadMaterial } from "../../../hooks/useCore";
 import DocumentViewerModal from "../../StudyMaterials/components/DocumentViewerModal";
 
 const RecentMaterials: React.FC = () => {
   const { data, isLoading } = useMaterials();
   const deleteMaterial = useDeleteMaterial();
+  const uploadMaterial = useUploadMaterial();
   const materials = data?.materials || [];
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -34,6 +36,13 @@ const RecentMaterials: React.FC = () => {
     setOpenMenuId(null);
     if (confirm("Delete this study material? This cannot be undone.")) {
       deleteMaterial.mutate(id);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      uploadMaterial.mutate(files);
     }
   };
 
@@ -134,17 +143,29 @@ const RecentMaterials: React.FC = () => {
             ))}
 
             {/* Upload New placeholder */}
-            <div className="bg-gray-50 dark:bg-slate-900/50 p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all cursor-pointer flex flex-col items-center justify-center text-center h-full min-h-[120px]">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className={`bg-gray-50 dark:bg-slate-900/50 p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all cursor-pointer flex flex-col items-center justify-center text-center h-full min-h-[120px] ${uploadMaterial.isPending ? 'opacity-50 pointer-events-none' : ''}`}
+            >
               <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 shadow-sm">
-                <LuPlus className="w-4 h-4" />
+                <LuPlus className={`w-4 h-4 ${uploadMaterial.isPending ? 'animate-spin' : ''}`} />
               </div>
               <span className="text-sm font-medium text-gray-600 dark:text-slate-400">
-                Upload New
+                {uploadMaterial.isPending ? 'Uploading...' : 'Upload New'}
               </span>
             </div>
           </>
         )}
       </div>
+
+      <input 
+        type="file" 
+        multiple 
+        ref={fileInputRef} 
+        onChange={handleFileUpload} 
+        className="hidden" 
+        accept=".pdf,.docx,.pptx,.doc,.ppt"
+      />
 
       {selectedMaterialId && (
         <DocumentViewerModal
