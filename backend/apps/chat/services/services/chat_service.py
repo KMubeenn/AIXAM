@@ -13,7 +13,7 @@ def estimate_tokens(input:str)->int:
 
 
 
-async def generate_response_with_persistence(chat_agent,session_id,message,user_id=None,grade_test=False,test_submission=None,study_material_id=None,quiz_id=None,grading_instructions=None):
+async def generate_response_with_persistence(chat_agent,session_id,message,user_id=None,grade_test=False,test_submission=None,study_material_id=None,quiz_id=None,grading_instructions=None,direct_task=None):
     chat_persistence=ChatPersistenceService()
     query=message[-1].content
     await chat_persistence.update_messages(session_id=session_id,role="user",content=query)
@@ -26,7 +26,7 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
             topic = await extractor.extract_topic(query)
             await chat_persistence.set_title(session_id=session_id,message=topic)
 
-        async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions,user_id=user_id):
+        async for output in chat_agent.run(input=message,id=session_id,grade_test=grade_test,test_submission=test_submission,grading_instructions=grading_instructions,user_id=user_id,direct_task=direct_task):
             if output["type"]=="token":
                 print(f"[DEBUG ChatService] Yielding token: {repr(output['content'])}")
                 full_response.append(output["content"])
@@ -85,26 +85,29 @@ async def _persist_structured_output(user_id, output, session_id, study_material
         record_id = None
         if output_type == 'flashcards':
             source_type = 'file' if study_material_id else 'topic'
+            title_str = topic if "flashcard" in topic.lower() else f"{topic} Flashcards"
             record_id = await CoreService.save_flashcard_set(
                 user_id=user_id,
                 cards=data,
-                title=f"{topic} Flashcards",
+                title=title_str,
                 source_type=source_type,
                 topic=topic,
                 study_material_id=study_material_id
             )
         elif output_type == 'mock_test':
+            title_str = topic if "mock test" in topic.lower() or "test" in topic.lower() else f"{topic} Mock Test"
             record_id = await CoreService.save_mock_test(
                 user_id=user_id,
                 questions=data,
-                title=f"{topic} Mock Test",
+                title=title_str,
                 study_material_id=study_material_id
             )
         elif output_type == 'mcq_test':
+            title_str = topic if "mcq" in topic.lower() or "test" in topic.lower() else f"{topic} MCQ Test"
             record_id = await CoreService.save_mcq_test(
                 user_id=user_id,
                 questions=data,
-                title=f"{topic} MCQ Test",
+                title=title_str,
                 study_material_id=study_material_id
             )
         elif output_type == 'mock_test_grades':

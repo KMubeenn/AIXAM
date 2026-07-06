@@ -99,6 +99,7 @@ async def agent_endpoint(request):
         test_submission=data.get('test_submission',None)
         quiz_id=data.get('quiz_id',None)
         grading_instructions=data.get('grading_instructions',None)
+        direct_task=data.get('direct_task',None)
 
         response=StreamingHttpResponse(
             generate_response_with_persistence(
@@ -110,7 +111,8 @@ async def agent_endpoint(request):
                 test_submission=test_submission,
                 study_material_id=study_material_id,
                 quiz_id=quiz_id,
-                grading_instructions=grading_instructions
+                grading_instructions=grading_instructions,
+                direct_task=direct_task
             )
         )
         response['cache-control']='no-cache'

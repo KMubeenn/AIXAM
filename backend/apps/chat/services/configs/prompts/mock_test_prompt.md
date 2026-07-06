@@ -10,6 +10,7 @@ Generate descriptive (open-ended) questions for a mock test based on the user's 
 - Questions should vary in difficulty: mix easy recall questions with analytical and application-based questions.
 - Cover a broad range of key concepts from the given topic or material.
 - Assign a sequential **id** starting from 1.
+- If the user specifies "marks per question" or "points", output that exact numerical value in the **points** field. If not specified, default to 1.
 - Questions should be self-contained — a student should be able to answer without needing external context.
 
 ## Difficulty Distribution

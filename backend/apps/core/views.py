@@ -465,12 +465,47 @@ async def get_performance(request):
 # ──────────────────────────────────────────────
 
 @csrf_exempt
-@require_http_methods(['GET'])
+@require_http_methods(['GET', 'POST'])
 async def get_materials(request):
     try:
         user=await sync_to_async(get_user_from_request)(request=request)
         if not user:
             return JsonResponse({'error':'Unauthorized'},status=401)
+            
+        if request.method == 'POST':
+            files = request.FILES.getlist("files")
+            if not files:
+                return JsonResponse({'error': 'No files provided'}, status=400)
+                
+            from apps.chat.services.utilities.DocReader import DocumentReader
+            reader = DocumentReader()
+            uploaded_materials = []
+            
+            for uploaded_file in files:
+                # reader.read is synchronous
+                chunks = await sync_to_async(reader.read)(uploaded_file, filename=uploaded_file.name)
+                content = "\n\n".join(chunks)
+                
+                file_ext = uploaded_file.name.rsplit('.', 1)[-1].lower() if '.' in uploaded_file.name else ''
+                file_type_map = {'pdf': 'pdf', 'docx': 'docx', 'pptx': 'pptx', 'doc': 'docx', 'ppt': 'pptx'}
+                file_type = file_type_map.get(file_ext, 'pdf')
+                
+                material = await CoreService.save_study_material(
+                    user_id=user.id,
+                    title=uploaded_file.name,
+                    file_type=file_type,
+                    processed_content=content or '',
+                    origin_session_id=None
+                )
+                uploaded_materials.append({
+                    'id': str(material.id),
+                    'title': material.title,
+                    'file_type': material.file_type,
+                    'created_at': material.created_at.isoformat() if hasattr(material.created_at, 'isoformat') else str(material.created_at)
+                })
+                
+            return JsonResponse({'message': 'Materials uploaded successfully', 'materials': uploaded_materials}, status=201)
+
         materials=await CoreService.get_user_materials(user.id)
         return JsonResponse({'materials':materials})
     except Exception as e:

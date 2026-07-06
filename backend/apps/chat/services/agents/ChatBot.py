@@ -67,7 +67,7 @@ class Agent():
             self.document_context = content
         print(f"[ContextLoad] Loaded direct content for '{title}' ({len(content)} chars)")
 
-    async def run(self,input:list,id:str,grade_test=False,test_submission=None,grading_instructions=None,user_id=None):
+    async def run(self,input:list,id:str,grade_test=False,test_submission=None,grading_instructions=None,user_id=None,direct_task=None):
         system_prompt=self.build_prompt()
         # Pass document_context and the last generated document into the LangGraph config
         # so the upload_*_to_classroom tools can access them without state changes
@@ -98,6 +98,9 @@ class Agent():
             state_input['student_submissions']=test_submission
             if grading_instructions:
                 state_input['grading_instructions']=grading_instructions
+        
+        if direct_task:
+            state_input['direct_task'] = direct_task
 
         streamed_tokens = False  # track if any conversational text was streamed
 

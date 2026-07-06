@@ -17,6 +17,7 @@ from langchain.chat_models import init_chat_model
 class GenerateMockTest(TypedDict,total=False):
     id:int
     question:str
+    points:int
 
 class GradeMockTest(TypedDict,total=False):
     id:int
@@ -180,6 +181,8 @@ class StudentAgent():
     # ──────────────────────────────────────────────
 
     def entry_router(self,state:StudentState):
+        if state.get('direct_task'):
+            return "direct_task"
         if state.get('grade_test'):
             return "grade"
         return "conversation"
@@ -190,6 +193,24 @@ class StudentAgent():
             return "call_tool"
         else:
             return "pass"
+
+    def direct_task_node(self, state:StudentState):
+        task = state.get('direct_task')
+        current_calls = state.get('llm_calls', 0)
+        results = {}
+        
+        try:
+            if task == 'flashcards':
+                results = self._generate_flashcards(state)
+            elif task == 'mock_test':
+                results = self._generate_mock_test(state)
+            elif task == 'mcq_mock_test':
+                results = self._generate_mcq_mock_test(state)
+            results['llm_calls'] = current_calls + 1
+        except Exception as e:
+            print(f"[StudentAgent] ❌ Direct Task error: {e}")
+            
+        return results
 
     # ──────────────────────────────────────────────
     # TASK FUNCTIONS (called by orchestrator)
@@ -271,10 +292,12 @@ class StudentAgent():
         agent_builder.add_node("tool_node",StudentTools.return_tool_node())
         agent_builder.add_node("orchestrator",self.orchestrator)
         agent_builder.add_node("grade_mock_test_node",self.grade_mock_test)
+        agent_builder.add_node("direct_task_node",self.direct_task_node)
 
         agent_builder.add_conditional_edges(START,self.entry_router,{
             "conversation":"llm_call",
-            "grade":"grade_mock_test_node"
+            "grade":"grade_mock_test_node",
+            "direct_task":"direct_task_node"
         })
 
         agent_builder.add_conditional_edges("llm_call",self.should_use_tool,{
@@ -285,6 +308,7 @@ class StudentAgent():
         agent_builder.add_edge("tool_node","orchestrator")
         agent_builder.add_edge("orchestrator",END)
         agent_builder.add_edge("grade_mock_test_node",END)
+        agent_builder.add_edge("direct_task_node",END)
 
         agent=agent_builder.compile(checkpointer=self.memory)
 

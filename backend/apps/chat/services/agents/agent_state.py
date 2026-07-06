@@ -10,6 +10,7 @@ class BaseState(TypedDict , total=False):
     files_input : str
     messages : Annotated[Sequence[BaseMessage],add_messages]
     llm_calls : int 
+    direct_task : str 
     # flashcards : dict
     # assignment : dict
     # grades : dict
