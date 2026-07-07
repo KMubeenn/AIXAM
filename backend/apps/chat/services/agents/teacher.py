@@ -134,6 +134,14 @@ class TeacherAgent:
 
     def llm_call(self, state: TeacherState):
         print(f"[DEBUG TeacherAgent] llm_call node entered. Messages count: {len(state.get('messages', []))}")
+        
+        # Safety guard: stop infinite tool-call loops
+        llm_calls = state.get('llm_calls', 0)
+        if llm_calls >= 8:
+            print("[TeacherAgent] ⚠️ Max steps reached, stopping loop.")
+            from langchain.messages import AIMessage
+            return {"messages": [AIMessage(content="I've completed the requested tasks. Please let me know if you need anything else.")]}
+        
         messages = [state['system_prompt']]
         if state.get('files_input'):
             messages.append(SystemMessage(content=f"Available Reference Material:\n{state.get('files_input')}"))
@@ -144,7 +152,7 @@ class TeacherAgent:
             messages=messages,
             temperature=self.temperature,
         )
-        return {"messages": [response]}
+        return {"messages": [response], "llm_calls": llm_calls + 1}
 
     def should_use_tool(self, state: TeacherState):
         last_message = state['messages'][-1]
@@ -318,6 +326,55 @@ class TeacherAgent:
                     final_state.update(output)
                     step_outputs[step['step']] = {"title": output['slide_outline'].get('presentation_title'), "slides": output['slide_outline'].get('slides', [])}
                     llm_calls += 1
+
+                elif task == 'post_to_classroom':
+                    # Post the previously generated assignment/quiz directly to Google Classroom
+                    # Uses ClassroomService directly — no file attachment, pure text-based assignment
+                    course_ids = step.get('course_ids') or []
+                    source_step = depends_on
+                    source_data = step_outputs.get(source_step) if source_step else None
+
+                    if not source_data:
+                        print("[TeacherAgent] post_to_classroom: no source data found from depends_on step.")
+                    elif not course_ids:
+                        print("[TeacherAgent] post_to_classroom: no course_ids provided.")
+                    else:
+                        from apps.chat.services.utilities.ClassroomService import ClassroomService
+                        from apps.users.models import User
+                        from langgraph.config import get_config
+
+                        try:
+                            cfg = get_config()
+                            user_id = cfg.get("configurable", {}).get("user_id")
+                        except Exception:
+                            user_id = None
+
+                        classroom_results = []
+                        title = source_data.get('title', 'Assignment')
+                        questions = source_data.get('questions', [])
+                        description = f"Please complete the following assignment: {title}"
+                        max_points = sum(q.get('marks', q.get('points', 10)) for q in questions) or 100
+
+                        if user_id:
+                            try:
+                                user = User.objects.get(id=user_id)
+                                for course_id in course_ids:
+                                    result = ClassroomService.post_assignment(
+                                        user=user,
+                                        course_id=course_id,
+                                        title=title,
+                                        description=description,
+                                        max_points=float(max_points)
+                                    )
+                                    classroom_results.append({"course_id": course_id, "status": "success"})
+                                    print(f"[TeacherAgent] ✅ Posted '{title}' to course {course_id}")
+                            except Exception as e:
+                                print(f"[TeacherAgent] ❌ post_to_classroom error: {e}")
+                        else:
+                            print("[TeacherAgent] post_to_classroom: user_id not found in config.")
+
+                        final_state['classroom_upload_result'] = classroom_results
+                        step_outputs[step['step']] = classroom_results
 
             final_state['llm_calls'] = llm_calls
             if 'messages' in final_state:

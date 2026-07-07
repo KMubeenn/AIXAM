@@ -51,9 +51,22 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
                 'items': structured_outputs
             }
 
-        if response:
+        if response or structured_outputs:
+            if not response:
+                response = "I have generated the requested content."
+                
+            memory_response = response
+            if structured_outputs:
+                memory_response += "\n\n[System Memory: You generated the following content in this turn:]\n"
+                for mo in structured_outputs:
+                    memory_response += f"- Type: {mo.get('type')}, Summary: {mo.get('text_summary')}\n"
+                    if mo.get('extra_details'):
+                        memory_response += f"  Details for posting to Google Classroom: {json.dumps(mo.get('extra_details'))}\n"
+                    if mo.get('type') == 'document':
+                        memory_response += f"  Document is ready to be uploaded using upload_generated_file_to_classroom tool. Format: {mo.get('text_summary').split()[0].lower()}\n"
+
             await chat_persistence.update_messages(session_id=session_id, role='assistant', content=response, metadata=pending_metadata)
-            await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=response)
+            await chat_persistence.update_session_memory(session_id=session_id,human_message=query,ai_message=memory_response)
     except Exception as e:
         error_msg = "Sorry, I encountered an error. Please try again."
         await chat_persistence.update_messages(session_id=session_id, role='assistant', content=error_msg)
@@ -192,6 +205,12 @@ async def _persist_structured_output(user_id, output, session_id, study_material
                 'record_id': str(record_id),
                 'text_summary': label_map.get(output_type, 'Study material generated.'),
             }
+            if output_type == 'assignment':
+                metadata['extra_details'] = {
+                    'title': title,
+                    'description': f"Generated assignment for {topic}",
+                    'max_points': data.get('total_marks', 100)
+                }
 
         return record_id, metadata
 

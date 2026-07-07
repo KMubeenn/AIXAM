@@ -4,6 +4,7 @@ from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableConfig
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from langgraph.prebuilt import InjectedState
 
 VALID_TEACHER_TASKS = [
     "assignment",
@@ -11,13 +12,15 @@ VALID_TEACHER_TASKS = [
     "slide_outline",
     "generate_pdf",
     "generate_docx",
-    "generate_pptx"
+    "generate_pptx",
+    "post_to_classroom"
 ]
 
 class TeacherTaskStep(BaseModel):
     step: int = Field(..., description="Sequential step number starting from 1")
-    task: str = Field(..., description='One of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx"')
+    task: str = Field(..., description='One of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx", "post_to_classroom"')
     depends_on: Optional[int] = Field(default=None, description="Step number that this task depends on, or null/None if independent")
+    course_ids: Optional[List[str]] = Field(default=None, description="List of Google Classroom course_id strings to post to. Only for post_to_classroom task.")
 
 class TeacherTools():
     @staticmethod
@@ -28,18 +31,21 @@ class TeacherTools():
         Plan the tasks needed to fulfill the teacher's request.
         Return a list of steps where each step is a dict with:
         - step: int (sequential step number starting from 1)
-        - task: one of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx"
-        - depends_on: int or null. If this task needs the output of a previous step (e.g. exporting generated assignments as a PDF), set this to that step number. Otherwise null.
+        - task: one of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx", "post_to_classroom"
+        - depends_on: int or null. If this task needs the output of a previous step, set this to that step number.
+        - course_ids: list of course_id strings (ONLY for post_to_classroom task)
 
         Rules:
         - Steps execute in order.
-        - If the user wants content exported as a document (e.g. "give me the assignment in PDF"), create the content step first, then a document step that depends on it.
-        - If the user wants to generate a document from arbitrary text, chat history, or an uploaded document (e.g. "generate my resume as a PDF"), schedule ONLY the `generate_pdf` (or `generate_docx`) task with `depends_on: null`.
+        - If the user wants content exported as a document, create the content step first, then a document step that depends on it.
+        - If the user wants to generate a document from arbitrary text or an uploaded file, schedule ONLY the generate task with depends_on: null.
         - If tasks are independent, set depends_on to null for both.
         - For a single simple task, return a list with one step.
+        - "post_to_classroom" MUST always depend on a prior "assignment" or "teacher_quiz" step. NEVER use post_to_classroom without a prior generation step. Always call list_google_courses FIRST before plan_tasks so you have the course_ids ready.
 
         Examples:
         - "Create an assignment on databases" -> [{"step": 1, "task": "assignment", "depends_on": null}]
+        - "Create an assignment on LLMs and post to course 123 and 456" -> [{"step": 1, "task": "assignment", "depends_on": null}, {"step": 2, "task": "post_to_classroom", "depends_on": 1, "course_ids": ["123", "456"]}]
         - "Quiz on ML and export as PDF" -> [{"step": 1, "task": "teacher_quiz", "depends_on": null}, {"step": 2, "task": "generate_pdf", "depends_on": 1}]
         - "Turn my resume into a PDF" -> [{"step": 1, "task": "generate_pdf", "depends_on": null}]
         """
@@ -241,7 +247,8 @@ class TeacherTools():
         description: str,
         max_points: str,
         file_format: str,
-        config: RunnableConfig,
+        state: dict = InjectedState,
+        config: RunnableConfig = None,
     ) -> str:
         """
         Upload a file that was just generated (PPTX, PDF, or DOCX) to Google Classroom as an assignment.
@@ -260,13 +267,14 @@ class TeacherTools():
             from apps.chat.services.utilities.ClassroomService import ClassroomService
             import base64
 
-            user_id = config.get("configurable", {}).get("user_id")
+            # Retrieve user_id from config
+            user_id = config.get("configurable", {}).get("user_id") if config else None
             if not user_id:
                 return "Error: User ID not found in context."
             user = User.objects.get(id=user_id)
 
-            # The generated document is stored in configurable extras by the orchestrator
-            document_info = config.get("configurable", {}).get("generated_document")
+            # The generated document is stored in the agent's state
+            document_info = state.get("document")
             if not document_info:
                 return (
                     f"Error: No generated {file_format.upper()} found in this session. "

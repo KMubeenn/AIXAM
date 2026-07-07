@@ -16,6 +16,12 @@ try:
 except ImportError:
     PDF_AVAILABLE = False
 
+try:
+    import pptx
+    PPTX_AVAILABLE = True
+except ImportError:
+    PPTX_AVAILABLE = False
+
 class DocumentReader:
     """
     Reads text from various document types: TXT, PDF, DOCX.
@@ -30,6 +36,8 @@ class DocumentReader:
             self.supported_extensions.append(".pdf")
         if DOCX_AVAILABLE:
             self.supported_extensions.append(".docx")
+        if PPTX_AVAILABLE:
+            self.supported_extensions.append(".pptx")
     
     @property
     def SUPPORTED_EXTENSIONS(self) -> List[str]:
@@ -94,6 +102,8 @@ class DocumentReader:
                 return self._read_pdf_from_path(path)
             elif ext == ".docx":
                 return self._read_docx_from_path(path)
+            elif ext == ".pptx":
+                return self._read_pptx_from_path(path)
         except Exception as e:
             logging.error(f"Error reading {file_path}: {e}")
             raise Exception(f"Failed to read {file_path}: {e}")
@@ -115,6 +125,8 @@ class DocumentReader:
                 return self._read_pdf_from_object(file_obj)
             elif ext == ".docx":
                 return self._read_docx_from_object(file_obj)
+            elif ext == ".pptx":
+                return self._read_pptx_from_object(file_obj)
         except Exception as e:
             logging.error(f"Error reading {filename}: {e}")
             raise Exception(f"Failed to read {filename}: {e}")
@@ -127,6 +139,8 @@ class DocumentReader:
             raise ValueError("PDF support requires PyPDF2 library")
         if not DOCX_AVAILABLE and ext == ".docx":
             raise ValueError("DOCX support requires python-docx library")
+        if not PPTX_AVAILABLE and ext == ".pptx":
+            raise ValueError("PPTX support requires python-pptx library")
     
 
     def _read_txt_from_path(self, path: Path, encoding: str) -> List[str]:
@@ -163,6 +177,14 @@ class DocumentReader:
             
         doc = docx.Document(str(path))
         return self._extract_docx_text(doc)
+
+    def _read_pptx_from_path(self, path: Path) -> List[str]:
+        """Read PPTX file from path and extract text from each slide."""
+        if not PPTX_AVAILABLE:
+            raise ValueError("PPTX support requires python-pptx library")
+            
+        prs = pptx.Presentation(str(path))
+        return self._extract_pptx_text(prs)
     
 
     def _read_txt_from_object(self, file_obj, encoding: str) -> List[str]:
@@ -228,6 +250,21 @@ class DocumentReader:
             
         except Exception as e:
             raise Exception(f"Failed to read DOCX from file object: {e}")
+
+    def _read_pptx_from_object(self, file_obj) -> List[str]:
+        """Read PPTX from file object and extract text from each slide."""
+        if not PPTX_AVAILABLE:
+            raise ValueError("PPTX support requires python-pptx library")
+        
+        try:
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+            
+            prs = pptx.Presentation(file_obj)
+            return self._extract_pptx_text(prs)
+            
+        except Exception as e:
+            raise Exception(f"Failed to read PPTX from file object: {e}")
     
     def _extract_pdf_text(self, reader) -> List[str]:
         """Extract text from PDF reader object."""
@@ -248,6 +285,18 @@ class DocumentReader:
         for para in doc.paragraphs:
             if para.text and para.text.strip():
                 texts.append(para.text.strip())
+        return texts
+
+    def _extract_pptx_text(self, prs) -> List[str]:
+        """Extract text from PPTX presentation object."""
+        texts = []
+        for slide in prs.slides:
+            slide_text = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text:
+                    slide_text.append(shape.text.strip())
+            if slide_text:
+                texts.append("\n".join(slide_text))
         return texts
 
 if __name__ == "__main__":

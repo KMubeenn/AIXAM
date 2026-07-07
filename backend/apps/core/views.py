@@ -223,7 +223,9 @@ async def get_student_insights_view(request):
 
 Do two things and return ONLY valid JSON with no markdown or code fences:
 1. Group these topics into broad academic subjects (e.g. "Artificial Intelligence", "Mathematics", "Geography"). Average the scores per subject.
-2. Generate exactly 3 short personalized insights based on the data (one strength, one weakness, one study tip).
+2. Generate exactly 3 short personalized insights based on the data. Use the types: "strength", "weakness", or "tip".
+   - If the student has good scores, provide 1 strength, 1 weakness, and 1 tip.
+   - If the scores are very low (e.g. 0%), do not invent a fake "strength" (like "clear starting point"). Instead, provide 2 "tip"s (encouraging advice on how to start studying) and 1 "weakness" (identifying the core gap).
 
 Return this exact JSON structure:
 {{
@@ -237,15 +239,17 @@ Return this exact JSON structure:
   ]
 }}"""
 
-        from langchain.chat_models import init_chat_model
-        import os, json as json_lib
-        llm = init_chat_model(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-            model_provider="google_genai",
-            api_key=os.getenv("GEMINI_API_KEY"),
-            temperature=0.3,
+        from apps.chat.services.utilities.LLMRouter import invoke_with_fallback
+        import json as json_lib
+        
+        def build_insights_llm(base_llm):
+            return base_llm
+            
+        response = await sync_to_async(invoke_with_fallback)(
+            build_llm_fn=build_insights_llm,
+            messages=prompt,
+            temperature=0.3
         )
-        response = await llm.ainvoke(prompt)
         raw = response.content.strip()
         
         # Robust JSON extraction

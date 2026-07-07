@@ -468,3 +468,19 @@ def change_password(request):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_account(request):
+    """
+    Delete the authenticated user's account and all associated data.
+    """
+    user = get_user_from_request(request)
+    if not user:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+        
+    try:
+        user.delete()
+        return JsonResponse({"message": "Account deleted successfully."})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
