@@ -7,6 +7,7 @@ import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { AuthService } from "../../services/auth.service";
+import { toast } from "react-hot-toast";
 
 const CreateAccount: React.FC = () => {
   const navigate = useNavigate();
@@ -39,6 +40,8 @@ const CreateAccount: React.FC = () => {
         password: formData.password,
         role: formData.role.toLowerCase(),
       });
+      
+      toast.success("Account successfully created!");
 
       // Redirect to specific login page based on role
       if (formData.role.toLowerCase() === "student") {

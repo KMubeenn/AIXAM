@@ -53,7 +53,7 @@ const ChartsSection: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="date" tick={{ fill: textColor, fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fill: textColor, fontSize: 11 }} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, "Score"]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${v}%`, "Score"]} />
                 <Line
                   type="monotone" dataKey="score" stroke="#6366f1"
                   strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 7 }}
@@ -76,7 +76,7 @@ const ChartsSection: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="topic" tick={{ fill: textColor, fontSize: 10 }} angle={-30} textAnchor="end" />
                 <YAxis domain={[0, 100]} tick={{ fill: textColor, fontSize: 11 }} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, "Score"]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${v}%`, "Score"]} />
                 <Bar dataKey="score" radius={[4, 4, 0, 0]}>
                   {topicBars.map((entry, i) => (
                     <Cell key={i} fill={getBarColor(entry.score)} />

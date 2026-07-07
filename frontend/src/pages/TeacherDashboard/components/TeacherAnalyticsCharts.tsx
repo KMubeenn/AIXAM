@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { useTheme } from "../../../context/ThemeContext";
 import { useTeacherAnalytics } from "../../../hooks/useCore";
-import { LuUsers, LuTrendingUp, LuTrendingDown } from "react-icons/lu";
+import { LuUsers } from "react-icons/lu";
 
 const DISTRIBUTION_COLORS: Record<string, string> = {
   "90-100": "#10b981",
@@ -44,7 +44,7 @@ const TeacherAnalyticsCharts: React.FC = () => {
   return (
     <div className="space-y-6 mt-6">
       {/* Highlights row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 max-w-xs">
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-5 flex items-center gap-4">
           <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
             <LuUsers className="w-5 h-5" />
@@ -56,38 +56,6 @@ const TeacherAnalyticsCharts: React.FC = () => {
             ) : (
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{data?.student_count ?? 0}</p>
             )}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-5 flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
-            <LuTrendingUp className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-slate-400">Strongest Topic</p>
-            {isLoading ? (
-              <div className="h-6 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse mt-1" />
-            ) : (
-              <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">
-                {data?.strongest_topic ?? "N/A"}
-              </p>
-            )}
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">{data?.strongest_avg ?? 0}% avg</p>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-5 flex items-center gap-4">
-          <div className="p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg">
-            <LuTrendingDown className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-slate-400">Weakest Topic</p>
-            {isLoading ? (
-              <div className="h-6 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse mt-1" />
-            ) : (
-              <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">
-                {data?.weakest_topic ?? "N/A"}
-              </p>
-            )}
-            <p className="text-xs text-amber-600 dark:text-amber-400">{data?.weakest_avg ?? 0}% avg</p>
           </div>
         </div>
       </div>

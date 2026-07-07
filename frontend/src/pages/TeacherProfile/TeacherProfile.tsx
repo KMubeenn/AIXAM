@@ -9,6 +9,7 @@ import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import ChangePassword from "../../components/ChangePassword";
+import { AuthService } from "../../services/auth.service";
 
 const TeacherProfile: React.FC = () => {
   const { data: profile, isLoading: isProfileLoading } = useProfile();
@@ -26,6 +27,19 @@ const TeacherProfile: React.FC = () => {
     if (!token) return;
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
     window.location.href = `${apiUrl}/auth/google/login/?token=${token}`;
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm("Are you absolutely sure you want to delete your account? This action cannot be undone.")) {
+      try {
+        await AuthService.deleteAccount();
+        toast.success("Account deleted successfully");
+        localStorage.removeItem("token");
+        window.location.href = "/";
+      } catch (e: any) {
+        toast.error(e.message || "Failed to delete account");
+      }
+    }
   };
 
   const getInitials = (first?: string, last?: string) => {
@@ -140,6 +154,20 @@ const TeacherProfile: React.FC = () => {
                     <span className="text-sm text-gray-500 dark:text-slate-400">Total Submissions</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded-xl p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+                  Once you delete your account, there is no going back. Please be certain.
+                </p>
+                <button
+                  onClick={handleDeleteAccount}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Delete Account
+                </button>
               </div>
             </>
           )}

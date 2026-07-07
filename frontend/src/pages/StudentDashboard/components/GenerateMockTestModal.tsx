@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { LuX, LuUpload, LuLoader, LuFlaskConical } from "react-icons/lu";
 import { ChatService } from "../../../services/chat.service";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
 
 interface Props {
   isOpen: boolean;
@@ -20,15 +21,15 @@ const GenerateMockTestModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   const handleGenerate = async () => {
     if (!file) {
-      alert("Please upload a material first.");
+      toast.error("Please upload a material first.");
       return;
     }
     if (questionCount <= 0) {
-      alert("Please specify a valid number of questions.");
+      toast.error("Please specify a valid number of questions.");
       return;
     }
     if (testType === 'descriptive' && marksPerQuestion <= 0) {
-      alert("Please specify valid marks per question.");
+      toast.error("Please specify valid marks per question.");
       return;
     }
 
@@ -59,8 +60,9 @@ const GenerateMockTestModal: React.FC<Props> = ({ isOpen, onClose }) => {
       
       queryClient.invalidateQueries({ queryKey: ['quizzes'] });
       onClose();
+      toast.success("Mock test generated successfully!");
     } catch (e: any) {
-      alert(e.message || "Generation failed.");
+      toast.error(e.message || "Generation failed.");
     } finally {
       setIsGenerating(false);
     }

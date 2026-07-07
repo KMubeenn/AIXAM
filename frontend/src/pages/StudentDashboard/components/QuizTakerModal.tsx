@@ -5,6 +5,7 @@ import { useQuizDetail, useSubmitQuiz } from "../../../hooks/useCore";
 import { QuizQuestion } from "../../../services/core.service";
 import { ChatService } from "../../../services/chat.service";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
 
 interface QuizTakerModalProps {
   quizId: string;
@@ -110,9 +111,10 @@ const QuizTakerModal: React.FC<QuizTakerModalProps> = ({ quizId, onClose }) => {
         setDescriptiveResult(gradedResult);
         setSubmitted(true);
         queryClient.invalidateQueries({ queryKey: ['submissions'] });
+        toast.success("Written answers graded successfully!");
       }
     } catch (e: any) {
-      alert("Grading failed: " + e.message);
+      toast.error("Grading failed: " + e.message);
     } finally {
       setIsGrading(false);
     }

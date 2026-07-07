@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../services/api";
 import ChangePassword from "../../components/ChangePassword";
 import { LuUser, LuMail, LuCalendarClock } from "react-icons/lu";
+import { AuthService } from "../../services/auth.service";
+import toast from "react-hot-toast";
 
 const StudentProfile: React.FC = () => {
   const { data: profile, isLoading: isProfileLoading } = useProfile();
@@ -13,6 +15,19 @@ const StudentProfile: React.FC = () => {
   const getInitials = (first?: string, last?: string) => {
     if (!first) return "S";
     return `${first[0]}${last ? last[0] : ""}`.toUpperCase();
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm("Are you absolutely sure you want to delete your account? This action cannot be undone.")) {
+      try {
+        await AuthService.deleteAccount();
+        toast.success("Account deleted successfully");
+        localStorage.removeItem("token");
+        window.location.href = "/";
+      } catch (e: any) {
+        toast.error(e.message || "Failed to delete account");
+      }
+    }
   };
 
   return (
@@ -63,6 +78,20 @@ const StudentProfile: React.FC = () => {
 
               {/* Change Password */}
               <ChangePassword />
+
+              {/* Danger Zone */}
+              <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded-xl p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+                  Once you delete your account, there is no going back. Please be certain.
+                </p>
+                <button
+                  onClick={handleDeleteAccount}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Delete Account
+                </button>
+              </div>
 
             </>
           )}

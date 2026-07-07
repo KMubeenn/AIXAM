@@ -45,4 +45,13 @@ export const AuthService = {
       throw error.response?.data || error.message;
     }
   },
+
+  async deleteAccount(): Promise<{ message: string }> {
+    try {
+      const response = await api.delete<{ message: string }>("/auth/me/delete/");
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
 };
