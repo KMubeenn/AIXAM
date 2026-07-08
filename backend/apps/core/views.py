@@ -215,28 +215,101 @@ async def get_student_insights_view(request):
             return JsonResponse({'subjects': [], 'insights': []})
 
         # Build topic summary for LLM
-        topic_lines = [f"- {t.topic}: {round(t.strength_score, 1)}%" for t in topics_qs]
+        topic_lines = [f"- {t.topic}: Score {round(t.strength_score, 1)}% ({t.tests_taken} tests taken)" for t in topics_qs]
         topic_summary = "\n".join(topic_lines)
 
-        prompt = f"""You are an academic analytics assistant. A student has the following topic performance scores:
+        prompt = f"""You are an advanced academic analytics AI. A student has the following topic performance metrics:
 {topic_summary}
 
-Do two things and return ONLY valid JSON with no markdown or code fences:
-1. Group these topics into broad academic subjects (e.g. "Artificial Intelligence", "Mathematics", "Geography"). Average the scores per subject.
-2. Generate exactly 3 short personalized insights based on the data. Use the types: "strength", "weakness", or "tip".
-   - If the student has good scores, provide 1 strength, 1 weakness, and 1 tip.
-   - If the scores are very low (e.g. 0%), do not invent a fake "strength" (like "clear starting point"). Instead, provide 2 "tip"s (encouraging advice on how to start studying) and 1 "weakness" (identifying the core gap).
-
-Return this exact JSON structure:
+Analyze this actual performance data. DO NOT invent fake data. Calculate necessary metrics mathematically where required (assume exactly 10 questions per test to estimate 'questions_attempted', 'correct', and 'incorrect').
+Return ONLY valid JSON with no markdown formatting or code blocks matching this EXACT structure:
 {{
+  "overall_summary": {{
+    "accuracy": 68.0,
+    "questions_attempted": 124,
+    "total_correct": 84,
+    "total_incorrect": 40,
+    "avg_score": 68.0,
+    "subjects_attempted": 5,
+    "topics_covered": 12,
+    "summary_text": "Short personalized AI summary...",
+    "performance_badge": "Good"
+  }},
   "subjects": [
-    {{"name": "Subject Name", "avg_score": 85.0, "topics": ["topic1", "topic2"]}}
+    {{
+      "name": "Subject Name",
+      "accuracy": 85.0,
+      "questions_attempted": 30,
+      "correct": 25,
+      "incorrect": 5,
+      "avg_time_per_question": "45s"
+    }}
   ],
-  "insights": [
-    {{"type": "strength", "title": "Keep It Up!", "message": "Short personalized message."}},
-    {{"type": "weakness", "title": "Focus Area", "message": "Short personalized message."}},
-    {{"type": "tip", "title": "Study Tip", "message": "Short personalized message."}}
-  ]
+  "strongest_subjects": [
+    {{
+      "subject": "Subject Name",
+      "accuracy": 85.0,
+      "reason": "Why it's a strength",
+      "explanation": "AI explanation based on stats"
+    }}
+  ],
+  "weakest_subjects": [
+    {{
+      "subject": "Subject Name",
+      "accuracy": 40.0,
+      "incorrect_answers": 15,
+      "difficult_topics": ["topic1"],
+      "improvement_potential": "Estimated potential..."
+    }}
+  ],
+  "weakest_topics": [
+    {{
+      "topic_name": "Topic Name",
+      "accuracy": 30.0,
+      "questions_attempted": 10,
+      "recommendation": "Recommendation...",
+      "priority": "High"
+    }}
+  ],
+  "study_plan": [
+    {{
+      "day": "Day 1",
+      "action": "Review X...",
+      "details": "Complete 20 practice questions"
+    }}
+  ],
+  "learning_analysis": "Detailed personalized learning analysis based on data...",
+  "exam_readiness": {{
+    "score": 65,
+    "status": "Nearly Ready",
+    "explanation": "Brief explanation..."
+  }},
+  "improvement_potential": {{
+    "text": "If your weakest three topics improve above 70%, your estimated overall accuracy could increase from 61% to approximately 79%.",
+    "estimated_increase": 18
+  }},
+  "topic_heatmap": [
+    {{
+      "topic": "Topic Name",
+      "status": "Good",
+      "accuracy": 80.0,
+      "correct": 8,
+      "incorrect": 2,
+      "attempted": 10
+    }}
+  ],
+  "ai_recommendations": [
+    {{
+      "priority": "High Priority",
+      "topic": "Evaluation Metrics",
+      "estimated_benefit": "+8%",
+      "action": "Practice 15 additional questions."
+    }}
+  ],
+  "confidence_indicator": {{
+    "score": 85,
+    "explanation": "Confidence depends on the number of quizzes taken."
+  }}
 }}"""
 
         from apps.chat.services.utilities.LLMRouter import invoke_with_fallback
@@ -247,23 +320,28 @@ Return this exact JSON structure:
             
         response = await sync_to_async(invoke_with_fallback)(
             build_llm_fn=build_insights_llm,
-            messages=prompt,
-            temperature=0.3
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2
         )
-        raw = response.content.strip()
         
-        # Robust JSON extraction
-        start_idx = raw.find('{')
-        end_idx = raw.rfind('}')
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            raw = raw[start_idx:end_idx+1]
-            
-        result = json_lib.loads(raw.strip())
+        raw = response.content if hasattr(response, "content") else response
+        if isinstance(raw, str):
+            start_idx = raw.find('{')
+            end_idx = raw.rfind('}')
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                raw = raw[start_idx:end_idx+1]
+            try:
+                result = json_lib.loads(raw.strip())
+            except:
+                return JsonResponse({'error': 'Failed to parse AI output'}, status=500)
+        else:
+            result = raw
 
-        # Cache in memory for 15 minutes to avoid stale data while preventing spam
+        # Cache in memory for 15 minutes
         cache.set(cache_key, result, timeout=900)
         return JsonResponse(result)
     except Exception as e:
+        print(f"[Insights Error] {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 

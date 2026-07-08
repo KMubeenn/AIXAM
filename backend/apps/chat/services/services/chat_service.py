@@ -84,7 +84,7 @@ async def _persist_structured_output(user_id, output, session_id, study_material
     # Determine topic from chat session
     chat_persistence = ChatPersistenceService()
     session_title = await chat_persistence.get_title(session_id)
-    topic = session_title if session_title and session_title != "New Chat" else "General"
+    topic = session_title if session_title and session_title != "New Chat" else "Mixed Topics"
 
     METADATA_TYPE_MAP = {
         'flashcards': 'flashcards',
@@ -98,7 +98,12 @@ async def _persist_structured_output(user_id, output, session_id, study_material
         record_id = None
         if output_type == 'flashcards':
             source_type = 'file' if study_material_id else 'topic'
-            title_str = topic if "flashcard" in topic.lower() else f"{topic} Flashcards"
+            clean_topic = topic.replace(" Flashcards", "").replace(" flashcards", "").replace(" Flashcard", "").strip()
+            if clean_topic.lower() in ['flashcards', 'flashcard', 'uploaded material', 'mixed topics', 'general study']:
+                title_str = "Study Deck"
+            else:
+                title_str = f"{clean_topic} Deck"
+                
             record_id = await CoreService.save_flashcard_set(
                 user_id=user_id,
                 cards=data,
@@ -108,7 +113,8 @@ async def _persist_structured_output(user_id, output, session_id, study_material
                 study_material_id=study_material_id
             )
         elif output_type == 'mock_test':
-            title_str = topic if "mock test" in topic.lower() or "test" in topic.lower() else f"{topic} Mock Test"
+            clean_topic = topic.replace(" Mock Test", "").replace(" Test", "").strip()
+            title_str = "Practice Test" if clean_topic.lower() in ['mock test', 'test', 'uploaded material', 'mixed topics'] else f"{clean_topic} Test"
             record_id = await CoreService.save_mock_test(
                 user_id=user_id,
                 questions=data,
@@ -116,7 +122,8 @@ async def _persist_structured_output(user_id, output, session_id, study_material
                 study_material_id=study_material_id
             )
         elif output_type == 'mcq_test':
-            title_str = topic if "mcq" in topic.lower() or "test" in topic.lower() else f"{topic} MCQ Test"
+            clean_topic = topic.replace(" MCQ Test", "").replace(" MCQ", "").replace(" Test", "").strip()
+            title_str = "MCQ Practice" if clean_topic.lower() in ['mcq', 'mcq test', 'test', 'uploaded material', 'mixed topics', 'general study'] else f"{clean_topic} MCQ"
             record_id = await CoreService.save_mcq_test(
                 user_id=user_id,
                 questions=data,

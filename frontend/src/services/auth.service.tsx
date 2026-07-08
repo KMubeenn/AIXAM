@@ -13,9 +13,37 @@ export const AuthService = {
     email: string;
     password: string;
     role?: string;
+    otp_token: string;
   }): Promise<AuthResponse> {
     try {
       const response = await api.post<AuthResponse>("/auth/signup/", userData);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  async sendOtp(email: string, type: "signup" | "reset"): Promise<{ message: string }> {
+    try {
+      const response = await api.post<{ message: string }>("/auth/send-otp/", { email, type });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  async verifyOtp(email: string, otp: string): Promise<{ message: string; otp_token: string }> {
+    try {
+      const response = await api.post<{ message: string; otp_token: string }>("/auth/verify-otp/", { email, otp });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  async resetPassword(data: { email: string; otp_token: string; new_password: string }): Promise<{ message: string }> {
+    try {
+      const response = await api.post<{ message: string }>("/auth/reset-password/", data);
       return response.data;
     } catch (error: any) {
       throw error.response?.data || error.message;

@@ -45,3 +45,19 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.username
+
+
+class OTPVerification(models.fields.related.Model if False else models.Model):
+    """
+    Model to store OTP codes for email verification.
+    """
+    email = models.EmailField(unique=True)
+    otp_code = models.CharField(max_length=6)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+    
+    class Meta:
+        db_table = 'otp_verifications'
+        
+    def __str__(self):
+        return f"{self.email} - {self.otp_code}"

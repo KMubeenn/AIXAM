@@ -67,6 +67,7 @@ const ChangePassword: React.FC = () => {
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             required
+            autoComplete="current-password"
             className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
           />
         </div>
@@ -79,6 +80,7 @@ const ChangePassword: React.FC = () => {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
+            autoComplete="new-password"
             className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
           />
         </div>
@@ -91,6 +93,7 @@ const ChangePassword: React.FC = () => {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
+            autoComplete="new-password"
             className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
           />
         </div>

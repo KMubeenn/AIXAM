@@ -458,10 +458,7 @@ export const CoreService = {
     return response.data;
   },
 
-  async generateStudentInsights(): Promise<{
-    subjects: { name: string; avg_score: number; topics: string[] }[];
-    insights: { type: string; title: string; message: string }[];
-  }> {
+  async generateStudentInsights(): Promise<any> {
     const response = await api.post('/core/analytics/insights/');
     return response.data;
   },

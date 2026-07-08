@@ -71,6 +71,16 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_EXPOSE_HEADERS = ["X-Session-Id"]
 
 # Sessions (used for caching LLM responses like student insights)
+# Sessions (used for caching LLM responses like student insights)
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = False
+
+# Email Configuration for OTP Verification
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("SMTP_PORT", 587))
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv("EMAIL", "")
+EMAIL_HOST_PASSWORD = os.getenv("PASSWORD", "")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

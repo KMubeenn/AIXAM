@@ -8,7 +8,11 @@ from django.views.decorators.http import require_http_methods
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 
-from apps.users.models import User
+import random
+from datetime import timedelta
+from django.core.mail import send_mail
+
+from apps.users.models import User, OTPVerification
 from apps.users.jwt_utils import generate_token, get_user_from_request, user_to_dict
 
 
@@ -31,6 +35,7 @@ def signup(request):
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
     role = data.get("role", "student").strip().lower()
+    otp_token = data.get("otp_token", "")
     
     # Validation
     errors = {}
@@ -55,6 +60,25 @@ def signup(request):
     if role not in ['student', 'teacher', 'admin']:
         errors["role"] = "Invalid role"
     
+    if not otp_token:
+        errors["otp"] = "Email verification token is required"
+    else:
+        # Validate OTP token (we'll use the token format: "email:otp_code")
+        try:
+            stored_email, otp_code = otp_token.split(":")
+            if stored_email != email:
+                errors["otp"] = "Email does not match the verification token"
+            else:
+                otp_record = OTPVerification.objects.filter(
+                    email=email, 
+                    otp_code=otp_code, 
+                    is_verified=True
+                ).order_by('-expires_at').first()
+                if not otp_record:
+                    errors["otp"] = "Invalid or missing verification token"
+        except ValueError:
+            errors["otp"] = "Malformed verification token"
+
     if errors:
         return JsonResponse({"errors": errors}, status=400)
     
@@ -82,6 +106,10 @@ def signup(request):
         
         print(f"[Auth] User created: {user.email}")
         
+        # Delete the OTP record so it can't be reused
+        if 'otp_record' in locals() and otp_record:
+            otp_record.delete()
+        
         return JsonResponse({
             "user": user_to_dict(user),
             "token": token,
@@ -90,6 +118,155 @@ def signup(request):
     except Exception as e:
         print(f"[Auth] Signup error: {e}")
         return JsonResponse({"error": "Failed to create user"}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def send_otp(request):
+    """
+    Generate and send a 6-digit OTP to the provided email.
+    Request body: { email, type: "signup" | "reset" }
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        
+    email = data.get("email", "").strip().lower()
+    req_type = data.get("type", "signup")
+    
+    if not email or "@" not in email:
+        return JsonResponse({"error": "Valid email is required"}, status=400)
+        
+    # If signup, ensure email isn't already taken
+    if req_type == "signup" and User.objects.filter(email=email).exists():
+        return JsonResponse({"error": "An account with this email already exists"}, status=400)
+        
+    # If reset, ensure email exists
+    if req_type == "reset" and not User.objects.filter(email=email).exists():
+        return JsonResponse({"error": "No account found with this email"}, status=404)
+        
+    # Generate 6-digit OTP
+    otp_code = str(random.randint(100000, 999999))
+    
+    # Store/Update in DB
+    OTPVerification.objects.update_or_create(
+        email=email,
+        defaults={
+            "otp_code": otp_code,
+            "expires_at": timezone.now() + timedelta(minutes=10),
+            "is_verified": False
+        }
+    )
+    
+    # Send email
+    subject = "Your AIXAM Verification Code"
+    message = f"Your verification code is: {otp_code}\n\nThis code will expire in 10 minutes. Do not share this code with anyone."
+    
+    try:
+        send_mail(
+            subject,
+            message,
+            None, # Uses DEFAULT_FROM_EMAIL
+            [email],
+            fail_silently=False,
+        )
+        return JsonResponse({"message": "OTP sent successfully"})
+    except Exception as e:
+        print(f"[Auth] Email sending failed: {e}")
+        return JsonResponse({"error": "Failed to send email. Please check configuration."}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def verify_otp(request):
+    """
+    Verify the 6-digit OTP code.
+    Request body: { email, otp }
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        
+    email = data.get("email", "").strip().lower()
+    otp_code = data.get("otp", "").strip()
+    
+    if not email or not otp_code:
+        return JsonResponse({"error": "Email and OTP are required"}, status=400)
+        
+    otp_record = OTPVerification.objects.filter(email=email).order_by('-expires_at').first()
+    
+    if not otp_record:
+        return JsonResponse({"error": "No OTP requested for this email"}, status=400)
+        
+    if timezone.now() > otp_record.expires_at:
+        return JsonResponse({"error": "OTP has expired. Please request a new one."}, status=400)
+        
+    if otp_record.otp_code != otp_code:
+        return JsonResponse({"error": "Invalid OTP code"}, status=400)
+        
+    # Mark verified
+    otp_record.is_verified = True
+    otp_record.save()
+    
+    # Return a token that the frontend can use to prove verification during signup/reset
+    # Simple stateless token for demo: "email:otp_code"
+    return JsonResponse({
+        "message": "Email verified successfully",
+        "otp_token": f"{email}:{otp_code}"
+    })
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def reset_password(request):
+    """
+    Reset password for logged-out users using OTP token.
+    Request body: { email, otp_token, new_password }
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        
+    email = data.get("email", "").strip().lower()
+    otp_token = data.get("otp_token", "")
+    new_password = data.get("new_password", "")
+    
+    if not email or not otp_token or not new_password:
+        return JsonResponse({"error": "All fields are required"}, status=400)
+        
+    if len(new_password) < 6:
+        return JsonResponse({"error": "Password must be at least 6 characters"}, status=400)
+        
+    # Validate OTP token
+    try:
+        stored_email, otp_code = otp_token.split(":")
+        if stored_email != email:
+            return JsonResponse({"error": "Email does not match the verification token"}, status=400)
+            
+        otp_record = OTPVerification.objects.filter(
+            email=email, 
+            otp_code=otp_code, 
+            is_verified=True
+        ).order_by('-expires_at').first()
+        
+        if not otp_record:
+            return JsonResponse({"error": "Invalid or missing verification token"}, status=400)
+    except ValueError:
+        return JsonResponse({"error": "Malformed verification token"}, status=400)
+        
+    # Update user password
+    try:
+        user = User.objects.get(email=email)
+        user.password = make_password(new_password)
+        user.save()
+        
+        # Delete OTP record so it can't be reused
+        otp_record.delete()
+        
+        return JsonResponse({"message": "Password reset successfully"})
+    except User.DoesNotExist:
+        return JsonResponse({"error": "No account found with this email"}, status=404)
 
 
 @csrf_exempt

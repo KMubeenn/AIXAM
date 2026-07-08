@@ -48,7 +48,7 @@ const ChartsSection: React.FC = () => {
           <div className="h-80 flex items-center justify-center text-gray-400 text-sm">No test data yet</div>
         ) : (
           <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={timeline} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="date" tick={{ fill: textColor, fontSize: 11 }} />
@@ -66,12 +66,12 @@ const ChartsSection: React.FC = () => {
 
       {/* Topic Score Bar Chart */}
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-slate-800">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Topic Scores</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Subject Scores</h3>
         {isLoading ? <SkeletonChart /> : topicBars.length === 0 ? (
-          <div className="h-80 flex items-center justify-center text-gray-400 text-sm">No topic data yet</div>
+          <div className="h-80 flex items-center justify-center text-gray-400 text-sm">No subject data yet</div>
         ) : (
           <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={topicBars} margin={{ top: 5, right: 20, left: 0, bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="topic" tick={{ fill: textColor, fontSize: 10 }} angle={-30} textAnchor="end" />

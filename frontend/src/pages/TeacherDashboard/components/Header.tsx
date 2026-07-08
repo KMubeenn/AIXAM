@@ -1,6 +1,6 @@
 import React from "react";
 import logoImg from "../../../assets/logo/logo-only-black.png";
-import { LuMenu, LuBell, LuMessageSquare } from "react-icons/lu";
+import { LuMenu, LuMessageSquare } from "react-icons/lu";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useNavigate } from "react-router-dom";
 
@@ -36,9 +36,7 @@ const Header: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="p-2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 relative">
-            <LuBell className="w-6 h-6" />
-          </button>
+
           <button
             onClick={() => navigate("/chat")}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"

@@ -1,6 +1,6 @@
 import React from "react";
 import logoImg from "../../../assets/logo/logo-only-black.png";
-import { LuBell, LuMenu } from "react-icons/lu";
+import { LuMenu } from "react-icons/lu";
 import { useLocation } from "react-router-dom";
 
 const Header: React.FC = () => {
@@ -43,10 +43,7 @@ const Header: React.FC = () => {
           {getTitle()}
         </h1>
         <div className="flex items-center gap-4">
-          <button className="relative p-2 text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-            <LuBell className="w-5 h-5" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
-          </button>
+
         </div>
       </header>
     </>

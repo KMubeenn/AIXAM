@@ -4,7 +4,8 @@ Auth URL patterns.
 from django.urls import path
 from apps.users.views import (
     signup, login, logout, me, get_profile_view, change_password,
-    delete_account, google_classroom_login, google_classroom_callback, google_classroom_courses
+    delete_account, google_classroom_login, google_classroom_callback, google_classroom_courses,
+    send_otp, verify_otp, reset_password
 )
 
 urlpatterns = [
@@ -16,6 +17,10 @@ urlpatterns = [
     path("profile/", get_profile_view, name="auth_profile"),
     path("change-password/", change_password, name="auth_change_password"),
     
+    # OTP & Reset
+    path("send-otp/", send_otp, name="auth_send_otp"),
+    path("verify-otp/", verify_otp, name="auth_verify_otp"),
+    path("reset-password/", reset_password, name="auth_reset_password"),
     # Google Classroom
     path("google/login/", google_classroom_login, name="google_login"),
     path("google/callback/", google_classroom_callback, name="google_callback"),

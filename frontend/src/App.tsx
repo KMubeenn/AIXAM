@@ -20,6 +20,7 @@ import Home from "./pages/Home/Home";
 import LoginT from "./pages/LoginTeacher/LoginTeacher";
 import LoginS from "./pages/LoginStudent/LoginStudent";
 import CreateAccount from "./pages/CreateAccount/CreateAccount";
+import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
 
 const App: React.FC = () => {
   return (
@@ -49,6 +50,7 @@ const App: React.FC = () => {
           <Route path="/login-teacher" element={<LoginT />} />
           <Route path="/login-student" element={<LoginS />} />
           <Route path="/create-account" element={<CreateAccount />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
         </Route>
       </Routes>
     </Router>

@@ -13,7 +13,7 @@ const TopicPerformance: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-slate-800 mb-8">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Topic-Level Performance</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Subject-Level Performance</h3>
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
@@ -25,7 +25,7 @@ const TopicPerformance: React.FC = () => {
         </div>
       ) : topics.length === 0 ? (
         <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">
-          No topic data yet. Complete some assignments or mock tests!
+          No subject data yet. Complete some assignments or mock tests!
         </p>
       ) : (
         <div className="space-y-4">

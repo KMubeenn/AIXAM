@@ -48,7 +48,7 @@ const ScoreCards: React.FC = () => {
             <LuBookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
         </div>
-        <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Strongest Topic</p>
+        <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Strongest Subject</p>
         {isLoading ? <Skeleton /> : (
           <p className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2">
             {data?.strongest_topic ?? "N/A"}
