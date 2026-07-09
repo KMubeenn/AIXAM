@@ -4,6 +4,7 @@ import Hero from "./components/Hero";
 import Features from "./components/Features";
 import InteractivePreview from "./components/InteractivePreview";
 import Footer from "../../components/Footer";
+import About from "../About/About";
 
 const Home: React.FC = () => {
   return (
@@ -13,6 +14,7 @@ const Home: React.FC = () => {
         <Hero />
         <Features />
         <InteractivePreview />
+       
       </main>
       <Footer />
     </div>

@@ -21,6 +21,8 @@ import LoginT from "./pages/LoginTeacher/LoginTeacher";
 import LoginS from "./pages/LoginStudent/LoginStudent";
 import CreateAccount from "./pages/CreateAccount/CreateAccount";
 import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
+import About from "./pages/About/About";
+import WhyUs from "./pages/WhyUs/WhyUs";
 
 const App: React.FC = () => {
   return (
