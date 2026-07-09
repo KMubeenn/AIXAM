@@ -38,6 +38,7 @@ CORS_ALLOWED_ORIGINS = [
         "https://lexa-rho.vercel.app",
         "http://3.239.50.12",
         "http://100.49.176.178",
+        "https://aixam-opal.vercel.app",
 ]
 
 # Apps that will use Django ORM
