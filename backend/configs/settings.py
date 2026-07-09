@@ -6,19 +6,29 @@ DEBUG = os.getenv("DEBUG", "True").lower() == "false"
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "3.239.50.12", "100.49.176.178", "*"]
 
 # Database configuration - Supabase PostgreSQL
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("SUPABASE_DB_NAME", "postgres"),
-        "USER": os.getenv("SUPABASE_DB_USER", "postgres"),
-        "PASSWORD": os.getenv("SUPABASE_DB_PASSWORD", ""),
-        "HOST": os.getenv("SUPABASE_DB_HOST", "localhost"),
-        "PORT": os.getenv("SUPABASE_DB_PORT", "5432"),
-        "OPTIONS": {
-            "sslmode": "require",  # Supabase requires SSL
-        },
+import sys
+if 'pytest' in sys.modules or 'test' in sys.argv:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+            "ATOMIC_REQUESTS": False,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("SUPABASE_DB_NAME", "postgres"),
+            "USER": os.getenv("SUPABASE_DB_USER", "postgres"),
+            "PASSWORD": os.getenv("SUPABASE_DB_PASSWORD", ""),
+            "HOST": os.getenv("SUPABASE_DB_HOST", "localhost"),
+            "PORT": os.getenv("SUPABASE_DB_PORT", "5432"),
+            "OPTIONS": {
+                "sslmode": "require",
+            },
+        }
+    }
 
 CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
