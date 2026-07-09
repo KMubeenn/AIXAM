@@ -21,15 +21,15 @@ const InteractivePreview: React.FC = () => {
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-indigo-50">
                   <LuCheck className="w-5 h-5 text-teal-400 mr-3" />
-                  Free for individual students
+                  Turn any PDF or note into a mock test in seconds
                 </li>
                 <li className="flex items-center text-indigo-50">
                   <LuCheck className="w-5 h-5 text-teal-400 mr-3" />
-                  Institutional discounts available
+                  Instant grading so teachers get hours back every week
                 </li>
                 <li className="flex items-center text-indigo-50">
                   <LuCheck className="w-5 h-5 text-teal-400 mr-3" />
-                  GDPR & FERPA Compliant
+                  Know exactly where every student is struggling
                 </li>
               </ul>
               <button className="bg-white text-indigo-900 px-8 py-3 rounded-full font-bold hover:bg-indigo-50 transition-colors">
