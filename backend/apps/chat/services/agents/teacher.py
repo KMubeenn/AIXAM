@@ -228,7 +228,16 @@ class TeacherAgent:
             temperature=self.temperature,
         )
         content = result.content
+        
+        # Extract title from the first heading if present, and remove it from content to prevent double-printing
+        import re
         title = "Teacher_Document"
+        match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+        if match:
+            title = match.group(1).strip()
+            # Strip the first H1 header line from content
+            content = re.sub(r'^#\s+.+$', '', content, count=1, flags=re.MULTILINE).strip()
+            
         doc_writer = DocumentWriter()
         return {"document": doc_writer.write(title=title, content=content, format=format_type)}
 
@@ -289,6 +298,13 @@ class TeacherAgent:
                 return {"llm_calls": llm_calls}
 
             steps = tool_call['args'].get('steps', [])
+            if isinstance(steps, str):
+                import json
+                try:
+                    steps = json.loads(steps)
+                except Exception as e:
+                    print(f"[TeacherAgent] Failed to deserialize steps: {e}")
+
             step_outputs = {}
             final_state = {}
 

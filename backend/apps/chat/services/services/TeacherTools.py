@@ -2,7 +2,7 @@ import json
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableConfig
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from pydantic import BaseModel, Field
 from langgraph.prebuilt import InjectedState
 
@@ -25,18 +25,22 @@ class TeacherTaskStep(BaseModel):
 class TeacherTools():
     @staticmethod
     @tool
-    def plan_tasks(steps: List[TeacherTaskStep]):
-        """CRITICAL: ONLY use this tool if the teacher explicitly asks to generate an assignment, a quiz, or slides. If the teacher asks a normal question, is greeting you, or having a general conversation, DO NOT use this tool and reply directly to them.
+    def plan_tasks(steps: str):
+        """CRITICAL: ONLY use this tool if the teacher explicitly asks to generate an assignment, a quiz, or slides/presentations. If the teacher asks a normal question, is greeting you, or having a general conversation, DO NOT use this tool and reply directly to them.
 
         Plan the tasks needed to fulfill the teacher's request.
-        Return a list of steps where each step is a dict with:
-        - step: int (sequential step number starting from 1)
-        - task: one of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx", "post_to_classroom"
-        - depends_on: int or null. If this task needs the output of a previous step, set this to that step number.
-        - course_ids: list of course_id strings (ONLY for post_to_classroom task)
+
+        Args:
+            steps: A JSON-serialized string of a list of steps. DO NOT pass a raw list of objects; pass a JSON string representation instead.
+                   Each step is a dict with keys:
+                   - step: int (sequential step number starting from 1)
+                   - task: one of "assignment", "teacher_quiz", "slide_outline", "generate_pdf", "generate_docx", "generate_pptx", "post_to_classroom"
+                   - depends_on: int or null. If this task needs the output of a previous step, set this to that step number.
+                   - course_ids: list of course_id strings (ONLY for post_to_classroom task)
 
         Rules:
         - Steps execute in order.
+        - If the user wants a presentation or slides, ALWAYS plan a "slide_outline" step first, followed by a "generate_pptx" step that depends on the slide outline step.
         - If the user wants content exported as a document, create the content step first, then a document step that depends on it.
         - If the user wants to generate a document from arbitrary text or an uploaded file, schedule ONLY the generate task with depends_on: null.
         - If tasks are independent, set depends_on to null for both.
@@ -44,12 +48,32 @@ class TeacherTools():
         - "post_to_classroom" MUST always depend on a prior "assignment" or "teacher_quiz" step. NEVER use post_to_classroom without a prior generation step. Always call list_google_courses FIRST before plan_tasks so you have the course_ids ready.
 
         Examples:
-        - "Create an assignment on databases" -> [{"step": 1, "task": "assignment", "depends_on": null}]
-        - "Create an assignment on LLMs and post to course 123 and 456" -> [{"step": 1, "task": "assignment", "depends_on": null}, {"step": 2, "task": "post_to_classroom", "depends_on": 1, "course_ids": ["123", "456"]}]
-        - "Quiz on ML and export as PDF" -> [{"step": 1, "task": "teacher_quiz", "depends_on": null}, {"step": 2, "task": "generate_pdf", "depends_on": 1}]
-        - "Turn my resume into a PDF" -> [{"step": 1, "task": "generate_pdf", "depends_on": null}]
+        - "Create an assignment on databases" -> steps='[{"step": 1, "task": "assignment", "depends_on": null}]'
+        - "Create an assignment on LLMs and post to course 123 and 456" -> steps='[{"step": 1, "task": "assignment", "depends_on": null}, {"step": 2, "task": "post_to_classroom", "depends_on": 1, "course_ids": ["123", "456"]}]'
+        - "Quiz on ML and export as PDF" -> steps='[{"step": 1, "task": "teacher_quiz", "depends_on": null}, {"step": 2, "task": "generate_pdf", "depends_on": 1}]'
+        - "Create a presentation on humans" -> steps='[{"step": 1, "task": "slide_outline", "depends_on": null}, {"step": 2, "task": "generate_pptx", "depends_on": 1}]'
+        - "Turn my resume into a PDF" -> steps='[{"step": 1, "task": "generate_pdf", "depends_on": null}]'
         """
-        serialized_steps = [step.dict() for step in steps]
+        if isinstance(steps, str):
+            try:
+                serialized_steps = json.loads(steps)
+            except Exception:
+                serialized_steps = steps
+        else:
+            serialized_steps = steps
+
+        # Support both Pydantic models (from old tests/invocations) and dictionaries
+        if isinstance(serialized_steps, list):
+            final_list = []
+            for item in serialized_steps:
+                if hasattr(item, 'dict'):
+                    final_list.append(item.dict())
+                elif isinstance(item, dict):
+                    final_list.append(item)
+                else:
+                    final_list.append(item)
+            return json.dumps(final_list)
+
         return json.dumps(serialized_steps)
 
 
@@ -247,7 +271,7 @@ class TeacherTools():
         description: str,
         max_points: str,
         file_format: str,
-        state: dict = InjectedState,
+        state: Annotated[dict, InjectedState],
         config: RunnableConfig = None,
     ) -> str:
         """

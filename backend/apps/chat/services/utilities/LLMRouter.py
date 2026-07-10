@@ -40,11 +40,6 @@ _PRIORITY_MODELS = [
     },
     {
         "provider": "groq",
-        "model": "llama3-groq-70b-8192-tool-use-preview",
-        "label": "Groq — LLaMA 3 Groq 70B Tool-Use",
-    },
-    {
-        "provider": "groq",
         "model": "llama-3.1-8b-instant",
         "label": "Groq — LLaMA 3.1 8B Instant",
     },

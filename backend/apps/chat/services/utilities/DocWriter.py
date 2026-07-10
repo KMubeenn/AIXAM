@@ -67,20 +67,29 @@ class DocumentWriter():
         pdf.add_page()
         
         # Title
+        pdf.set_text_color(26, 55, 108)  # Primary Navy Blue (#1A376C)
         pdf.set_font('Helvetica', 'B', 20)
         pdf.cell(0, 15, title, ln=True, align='C')
         pdf.ln(10)
+        pdf.set_text_color(28, 28, 30)  # Reset to Dark Charcoal (#1C1C1E)
 
         # Convert Markdown to HTML for fpdf2's write_html
-        # We wrap it in a div with some basic style
         if MARKDOWN_AVAILABLE:
             html_content = markdown.markdown(content)
         else:
             html_content = content.replace('\n', '<br>')
+
+        # Override default fpdf2 heading colors (which default to red) using font color tag overrides
+        html_content = html_content.replace('<h1>', '<h1><font color="#1A376C">')
+        html_content = html_content.replace('</h1>', '</font></h1>')
+        html_content = html_content.replace('<h2>', '<h2><font color="#2E86C1">')
+        html_content = html_content.replace('</h2>', '</font></h2>')
+        html_content = html_content.replace('<h3>', '<h3><font color="#2E86C1">')
+        html_content = html_content.replace('</h3>', '</font></h3>')
         
         # Basic CSS-like styling for write_html
         full_html = f"""
-        <div style="font-family: Helvetica; font-size: 11pt; color: #333333; line-height: 1.5;">
+        <div style="font-family: Helvetica; font-size: 11pt; color: #1C1C1E; line-height: 1.5;">
             {html_content}
         </div>
         """
@@ -152,50 +161,166 @@ class DocumentWriter():
             else:
                 paragraph.add_run(part)
 
+    def _add_pptx_formatted_runs(self, paragraph, text: str, font_size, color):
+        """Parse **bold** markdown and add correctly formatted runs to a pptx paragraph."""
+        from pptx.util import Pt
+        parts = re.split(r'(\*\*.*?\*\*)', text)
+        for part in parts:
+            if not part:
+                continue
+            run = paragraph.add_run()
+            if part.startswith('**') and part.endswith('**'):
+                run.text = part[2:-2]
+                run.font.bold = True
+            else:
+                run.text = part
+                run.font.bold = False
+            run.font.size = font_size
+            run.font.color.rgb = color
+
     def _write_pptx(self, title: str, content: str) -> dict:
         if not PPTX_AVAILABLE:
             raise ImportError("python-pptx is required for PPTX generation.")
 
-        prs = Presentation()
-        
-        # Title Slide
-        title_slide_layout = prs.slide_layouts[0]
-        slide = prs.slides.add_slide(title_slide_layout)
-        slide.shapes.title.text = title
+        from pptx.util import Inches, Pt
+        from pptx.dml.color import RGBColor
 
-        # Split content into slides by main headings (# )
+        # ── Color Palette ──────────────────────────────────────────────────────
+        COLOR_PRIMARY = RGBColor(0x1A, 0x37, 0x6C)  # Deep navy blue
+        COLOR_ACCENT  = RGBColor(0x2E, 0x86, 0xC1)  # Bright blue
+        COLOR_WHITE   = RGBColor(0xFF, 0xFF, 0xFF)
+        COLOR_DARK    = RGBColor(0x1C, 0x1C, 0x1E)
+        COLOR_MUTED   = RGBColor(0xAA, 0xAA, 0xAA)
+
+        prs = Presentation()
+        slide_w = prs.slide_width
+        slide_h = prs.slide_height
+
+        # ── Title Slide ────────────────────────────────────────────────────────
+        blank_layout = prs.slide_layouts[6]  # fully blank layout for manual control
+        slide = prs.slides.add_slide(blank_layout)
+
+        # Full dark background
+        bg = slide.shapes.add_shape(1, 0, 0, slide_w, slide_h)
+        bg.fill.solid()
+        bg.fill.fore_color.rgb = COLOR_PRIMARY
+        bg.line.color.rgb = COLOR_PRIMARY
+
+        # Bottom accent strip
+        accent_h = int(slide_h * 0.14)
+        accent = slide.shapes.add_shape(1, 0, slide_h - accent_h, slide_w, accent_h)
+        accent.fill.solid()
+        accent.fill.fore_color.rgb = COLOR_ACCENT
+        accent.line.color.rgb = COLOR_ACCENT
+
+        # Title text box centered
+        tx = slide.shapes.add_textbox(Inches(0.8), Inches(1.4), slide_w - Inches(1.6), Inches(3.0))
+        tf = tx.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        run = p.add_run()
+        run.text = title
+        run.font.bold = True
+        run.font.size = Pt(40)
+        run.font.color.rgb = COLOR_WHITE
+
+        # ── Content Slides ─────────────────────────────────────────────────────
         sections = content.split('\n# ')
-        for i, section in enumerate(sections):
-            if not section.strip(): continue
-            
-            # Clean up first section if it started with #
-            if i == 0 and section.startswith('# '):
+
+        # Fallback: plain text with no markdown headers → split by double newlines
+        if len(sections) == 1:
+            sections = [s.strip() for s in content.split('\n\n') if s.strip()]
+
+        for idx, section in enumerate(sections):
+            if not section.strip():
+                continue
+
+            # Strip leading # if first section happened to start with it
+            if idx == 0 and section.startswith('# '):
                 section = section[2:]
-            
+
             lines = section.strip().split('\n')
-            slide_title = lines[0].strip().lstrip('# ')
-            
-            # Use bullet layout
-            bullet_layout = prs.slide_layouts[1]
-            slide = prs.slides.add_slide(bullet_layout)
-            slide.shapes.title.text = slide_title
-            
-            body_shape = slide.placeholders[1]
-            tf = body_shape.text_frame
-            tf.word_wrap = True
-            
-            first = True
-            for line in lines[1:]:
-                clean_line = line.strip().lstrip('-* ').strip()
-                if not clean_line: continue
-                
-                if first:
-                    tf.text = clean_line
-                    first = False
+            slide_title = lines[0].strip().lstrip('#- ').strip()
+            body_lines  = [l for l in lines[1:] if l.strip()]
+
+            # Skip creating a slide if there is no body content/bullets under the title
+            if not body_lines:
+                continue
+
+            slide = prs.slides.add_slide(blank_layout)
+
+            # White background
+            bg = slide.shapes.add_shape(1, 0, 0, slide_w, slide_h)
+            bg.fill.solid()
+            bg.fill.fore_color.rgb = COLOR_WHITE
+            bg.line.color.rgb = COLOR_WHITE
+
+            # Top header accent bar
+            bar_h = int(slide_h * 0.155)
+            bar = slide.shapes.add_shape(1, 0, 0, slide_w, bar_h)
+            bar.fill.solid()
+            bar.fill.fore_color.rgb = COLOR_PRIMARY
+            bar.line.color.rgb = COLOR_PRIMARY
+
+            # Slide number (bottom right)
+            num_box = slide.shapes.add_textbox(
+                slide_w - Inches(1.3), slide_h - Inches(0.45), Inches(1.0), Inches(0.3)
+            )
+            num_p = num_box.text_frame.paragraphs[0]
+            num_run = num_p.add_run()
+            num_run.text = str(idx + 1)
+            num_run.font.size = Pt(10)
+            num_run.font.color.rgb = COLOR_MUTED
+
+            # Slide title inside header bar
+            title_box = slide.shapes.add_textbox(
+                Inches(0.4), Inches(0.1), slide_w - Inches(0.8), int(bar_h * 0.85)
+            )
+            title_tf = title_box.text_frame
+            title_p  = title_tf.paragraphs[0]
+            title_run = title_p.add_run()
+            title_run.text = slide_title
+            title_run.font.bold  = True
+            title_run.font.size  = Pt(28)
+            title_run.font.color.rgb = COLOR_WHITE
+
+            # Body text box below header
+            body_top = bar_h + int(Inches(0.2))
+            body_box = slide.shapes.add_textbox(
+                Inches(0.5), body_top, slide_w - Inches(1.0), slide_h - body_top - Inches(0.5)
+            )
+            body_tf = body_box.text_frame
+            body_tf.word_wrap = True
+
+            first_line = True
+            for line in body_lines:
+                raw = line.strip()
+                if not raw:
+                    continue
+
+                is_bullet = raw.startswith(('-', '*', '•'))
+                clean = raw.lstrip('-*• ').strip()
+                if not clean:
+                    continue
+
+                if first_line:
+                    p = body_tf.paragraphs[0]
+                    first_line = False
                 else:
-                    p = tf.add_paragraph()
-                    p.text = clean_line
-                    p.level = 0 if not line.startswith('  ') else 1
+                    p = body_tf.add_paragraph()
+
+                p.space_after = Pt(10)
+
+                if is_bullet:
+                    # Colored bullet marker + formatted text
+                    bullet_run = p.add_run()
+                    bullet_run.text = "• "
+                    bullet_run.font.bold  = True
+                    bullet_run.font.size  = Pt(18)
+                    bullet_run.font.color.rgb = COLOR_ACCENT
+                    self._add_pptx_formatted_runs(p, clean, Pt(18), COLOR_DARK)
+                else:
+                    self._add_pptx_formatted_runs(p, clean, Pt(18), COLOR_DARK)
 
         buffer = io.BytesIO()
         prs.save(buffer)
@@ -207,3 +332,4 @@ class DocumentWriter():
             'file_base64': base64.b64encode(file_bytes).decode('utf-8'),
             'mime_type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
         }
+
