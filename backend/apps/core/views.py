@@ -469,6 +469,33 @@ async def get_submissions(request):
                 feedback=feedback,
                 grading_details=grading_details
             )
+            
+            # Update student performance dynamically on submission
+            try:
+                from apps.core.models import Quiz
+                quiz = await sync_to_async(Quiz.objects.prefetch_related('questions').get)(id=quiz_id)
+                clean_title = quiz.title.replace(" MCQ", "").replace(" MCQ Test", "").replace(" Mock Test", "").replace(" Test", "").replace(" Quiz", "").replace(" Practice", "").strip()
+                
+                if clean_title.lower() in ['', 'mcq', 'mcq test', 'test', 'uploaded material', 'mixed topics', 'general study', 'practice test', 'mcq practice', 'quiz']:
+                    questions_list = [{"question": q.text, "correct_answer": ""} for q in quiz.questions.all()]
+                    perfs = await CoreService.get_student_performance(user.id)
+                    banned_existing = ['mixed topics', 'uploaded material', 'general study', 'general']
+                    existing_topics = [p['topic'] for p in perfs if p.get('topic') and p['topic'].lower() not in banned_existing]
+                    
+                    from apps.chat.services.utilities.TestTopicEvaluator import TestTopicEvaluator
+                    evaluator = TestTopicEvaluator()
+                    topic = await evaluator.evaluate_topic({"grades": questions_list}, existing_topics)
+                else:
+                    topic = clean_title.title()
+                
+                await CoreService.update_student_performance(
+                    student_id=user.id,
+                    topic=topic,
+                    score=score
+                )
+            except Exception as e:
+                print(f"[Submissions Performance Error] {e}")
+
             return JsonResponse({'id': str(submission.id), 'message': 'Submission saved'}, status=201)
 
         submissions=await CoreService.get_user_submissions(user.id)

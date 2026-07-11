@@ -338,7 +338,7 @@ const Chat: React.FC = () => {
                                 </div>
                               </div>
                               <button
-                                onClick={() => navigate('/teacher-assignments')}
+                                onClick={() => navigate(output.record_id ? `/teacher-assignments?assignmentId=${output.record_id}` : '/teacher-assignments')}
                                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
                               >
                                 View Assignment
@@ -574,7 +574,7 @@ const Chat: React.FC = () => {
                                 </div>
                               </div>
                               <button
-                                onClick={() => navigate('/teacher-assignments')}
+                                onClick={() => navigate(item.record_id ? `/teacher-assignments?assignmentId=${item.record_id}` : '/teacher-assignments')}
                                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900 text-violet-600 dark:text-violet-400 text-xs font-bold rounded-lg hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 transition-all shadow-sm"
                               >
                                 View Assignment

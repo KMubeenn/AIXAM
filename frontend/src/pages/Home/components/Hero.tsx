@@ -5,7 +5,7 @@ import { useAuthStore } from "../../../store/useAuthStore";
 
 const Hero: React.FC = () => {
   const { isAuthenticated, user } = useAuthStore();
-  const dashboardPath = user?.role === 'teacher' ? "/teacher-dashboard" : "/student-dashboard";
+  const dashboardPath = user?.role === 'teacher' ? "/classroom" : "/student-dashboard";
 
   return (
     <section className="relative pt-20 pb-24 lg:pt-32 lg:pb-40 overflow-hidden">

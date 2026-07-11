@@ -66,17 +66,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onSessionSelect, onNewChat, activeSes
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
         <Link
-          to="/teacher-dashboard"
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
-            isActive("/teacher-dashboard")
-              ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
-              : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-100"
-          }`}
-        >
-          <LuLayoutDashboard className="w-5 h-5" />
-          Dashboard
-        </Link>
-        <Link
           to="/chat"
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             isActive("/chat")

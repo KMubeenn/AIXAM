@@ -1,24 +1,31 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Sidebar from "../TeacherDashboard/components/Sidebar";
 import Header from "../TeacherDashboard/components/Header";
 import { useProfile } from "../../hooks/useUser";
 import { useTeacherAnalytics } from "../../hooks/useCore";
-import { LuUser, LuMail, LuBookOpen, LuClipboardCheck, LuCalendarClock } from "react-icons/lu";
+import { LuUser, LuMail, LuBookOpen, LuClipboardCheck, LuCalendarClock, LuTrash2, LuX } from "react-icons/lu";
 import { FaGoogle } from "react-icons/fa";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import ChangePassword from "../../components/ChangePassword";
 import { AuthService } from "../../services/auth.service";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const TeacherProfile: React.FC = () => {
   const { data: profile, isLoading: isProfileLoading } = useProfile();
   const { data: analytics } = useTeacherAnalytics();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const hasShownToast = useRef(false);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
 
   useEffect(() => {
-    if (searchParams.get("connected") === "true") {
+    if (searchParams.get("connected") === "true" && !hasShownToast.current) {
+      hasShownToast.current = true;
       toast.success("Google Classroom connected successfully!");
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [searchParams]);
 
@@ -29,16 +36,20 @@ const TeacherProfile: React.FC = () => {
     window.location.href = `${apiUrl}/auth/google/login/?token=${token}`;
   };
 
+  const isDeletingRef = useRef(false);
   const handleDeleteAccount = async () => {
-    if (window.confirm("Are you absolutely sure you want to delete your account? This action cannot be undone.")) {
-      try {
-        await AuthService.deleteAccount();
-        toast.success("Account deleted successfully");
-        localStorage.removeItem("token");
-        window.location.href = "/";
-      } catch (e: any) {
-        toast.error(e.message || "Failed to delete account");
-      }
+    if (isDeletingRef.current) return;
+    isDeletingRef.current = true;
+    try {
+      await AuthService.deleteAccount();
+      toast.success("Account deleted successfully");
+      clearAuth();
+      navigate("/");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete account");
+      isDeletingRef.current = false;
+    } finally {
+      setShowDeleteModal(false);
     }
   };
 
@@ -84,7 +95,7 @@ const TeacherProfile: React.FC = () => {
                       </div>
                       {profile?.date_joined && (
                         <div className="inline-flex items-center text-xs text-gray-500 dark:text-slate-400">
-                          <LuCalendarClock className="w-3 h-3 mr-1" />
+                           <LuCalendarClock className="w-3 h-3 mr-1" />
                           Joined: {new Date(profile.date_joined).toLocaleDateString()}
                         </div>
                       )}
@@ -131,7 +142,7 @@ const TeacherProfile: React.FC = () => {
               {/* Account Stats Card */}
               <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Account Stats</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg border border-gray-100 dark:border-slate-700 flex flex-col items-center justify-center">
                     <LuBookOpen className="w-6 h-6 text-blue-500 mb-2" />
                     <span className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -146,13 +157,6 @@ const TeacherProfile: React.FC = () => {
                     </span>
                     <span className="text-sm text-gray-500 dark:text-slate-400">Quizzes Created</span>
                   </div>
-                  <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg border border-gray-100 dark:border-slate-700 flex flex-col items-center justify-center">
-                    <LuCalendarClock className="w-6 h-6 text-purple-500 mb-2" />
-                    <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {analytics?.total_submissions ?? 0}
-                    </span>
-                    <span className="text-sm text-gray-500 dark:text-slate-400">Total Submissions</span>
-                  </div>
                 </div>
               </div>
 
@@ -163,7 +167,7 @@ const TeacherProfile: React.FC = () => {
                   Once you delete your account, there is no going back. Please be certain.
                 </p>
                 <button
-                  onClick={handleDeleteAccount}
+                  onClick={() => setShowDeleteModal(true)}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                 >
                   Delete Account
@@ -173,6 +177,41 @@ const TeacherProfile: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Styled React Confirmation Modal for Deletion */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <LuX className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-4">
+              <LuTrash2 className="w-6 h-6" />
+              <h3 className="text-lg font-bold">Delete Account</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-slate-400 mb-6">
+              Are you absolutely sure you want to delete your account? This action is permanent and cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                className="px-4 py-2 text-sm font-semibold rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm"
+              >
+                Yes, Delete Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

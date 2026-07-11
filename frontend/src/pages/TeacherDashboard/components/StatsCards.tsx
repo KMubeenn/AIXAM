@@ -27,7 +27,7 @@ const StatsCards: React.FC = () => {
 
   return (
     <div className="space-y-6 mb-8">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Total Assignments */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
@@ -89,29 +89,6 @@ const StatsCards: React.FC = () => {
           </div>
         </div>
 
-        {/* Total Submissions */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
-              <LuCalendarClock className="w-6 h-6" />
-            </div>
-          </div>
-          {isAnalyticsLoading ? <Skeleton /> : (
-            <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {analytics?.total_submissions ?? 0}
-            </h3>
-          )}
-          <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">Total Submissions</p>
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800 space-y-1.5">
-            {isAnalyticsLoading ? (
-              <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded animate-pulse w-full" />
-            ) : (
-              <p className="text-xs text-gray-400 dark:text-slate-500">
-                Across all synced course assignments
-              </p>
-            )}
-          </div>
-        </div>
 
         {/* Class Average Score */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">

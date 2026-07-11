@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   LuWand,
   LuTrash2,
@@ -35,17 +36,33 @@ import {
 // ── Question Item (Editable Rubric) ──────────────────────────────────────────
 
 const QuestionItem: React.FC<{ q: any; idx: number }> = ({ q, idx }) => {
-  const [questionText, initialRubric] = (q.text || "").split("\n\nRUBRIC:");
+  // Parse sections from the stored text: question body, TASKS, DELIVERABLES, RUBRIC
+  const rawText: string = q.text || "";
+  const tasksMatch = rawText.match(/\n\nTASKS:\n([\s\S]*?)(?=\n\nDELIVERABLES:|\n\nRUBRIC:|$)/);
+  const deliverablesMatch = rawText.match(/\n\nDELIVERABLES:\n([\s\S]*?)(?=\n\nRUBRIC:|$)/);
+  const rubricMatch = rawText.match(/\n\nRUBRIC: ([\s\S]*)$/);
+
+  // Question body is everything before the first section marker
+  const questionBody = rawText.split(/\n\nTASKS:|\n\nDELIVERABLES:|\n\nRUBRIC:/)[0].trim();
+  const tasksText = tasksMatch ? tasksMatch[1].trim() : "";
+  const deliverablesText = deliverablesMatch ? deliverablesMatch[1].trim() : "";
+  const [initialRubric] = [rubricMatch ? rubricMatch[1].trim() : ""];
+
   const [isEditing, setIsEditing] = useState(false);
-  const [rubricText, setRubricText] = useState(initialRubric ? initialRubric.trim() : "");
+  const [rubricText, setRubricText] = useState(initialRubric);
   const [points, setPoints] = useState<number>(q.points || 1);
   const [errorMsg, setErrorMsg] = useState("");
   const updateQuestion = useUpdateQuestion();
 
+  const parseBullets = (text: string) =>
+    text.split('\n').map(l => l.replace(/^-\s*/, '').trim()).filter(Boolean);
+
   const handleSave = async () => {
     setErrorMsg("");
     try {
-      const newText = `${questionText.trim()}\n\nRUBRIC:${rubricText.trim()}`;
+      const tasksSection = tasksText ? `\n\nTASKS:\n${tasksText}` : "";
+      const deliverablesSection = deliverablesText ? `\n\nDELIVERABLES:\n${deliverablesText}` : "";
+      const newText = `${questionBody}${tasksSection}${deliverablesSection}\n\nRUBRIC: ${rubricText.trim()}`;
       await updateQuestion.mutateAsync({ questionId: q.id, data: { text: newText, points } });
       setIsEditing(false);
     } catch (err: any) {
@@ -54,16 +71,16 @@ const QuestionItem: React.FC<{ q: any; idx: number }> = ({ q, idx }) => {
   };
 
   return (
-    <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 space-y-2">
+    <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 space-y-3">
       <div className="flex items-start gap-3">
         <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center">
           {idx + 1}
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">
-            {questionText}
+          <p className="text-sm font-semibold text-gray-800 dark:text-slate-200 leading-relaxed">
+            {questionBody}
           </p>
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-3 mt-1">
             <span className="text-xs text-gray-400 dark:text-slate-500 capitalize">
               {q.question_type}
             </span>
@@ -94,7 +111,38 @@ const QuestionItem: React.FC<{ q: any; idx: number }> = ({ q, idx }) => {
           </div>
         </div>
       </div>
-      
+
+      {/* Tasks */}
+      {tasksText && (
+        <div className="pl-9 space-y-1">
+          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Tasks</p>
+          <ul className="space-y-0.5">
+            {parseBullets(tasksText).map((t, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-xs text-gray-700 dark:text-slate-300">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                {t}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Deliverables */}
+      {deliverablesText && (
+        <div className="pl-9 space-y-1">
+          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Deliverables</p>
+          <ul className="space-y-0.5">
+            {parseBullets(deliverablesText).map((d, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                {d}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Rubric (editable) */}
       {isEditing ? (
         <div className="pl-9 mt-2 space-y-2">
           {errorMsg && <p className="text-xs text-red-500 mb-2">{errorMsg}</p>}
@@ -109,7 +157,7 @@ const QuestionItem: React.FC<{ q: any; idx: number }> = ({ q, idx }) => {
             <button
               onClick={() => {
                 setIsEditing(false);
-                setRubricText(initialRubric ? initialRubric.trim() : "");
+                setRubricText(initialRubric);
                 setPoints(q.points);
                 setErrorMsg("");
               }}
@@ -746,6 +794,17 @@ const AssignmentsList: React.FC = () => {
   const [postModalAssignmentId, setPostModalAssignmentId] = useState<
     string | null
   >(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryAssignmentId = searchParams.get("assignmentId");
+
+  useEffect(() => {
+    if (queryAssignmentId) {
+      setSelectedId(queryAssignmentId);
+      searchParams.delete("assignmentId");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [queryAssignmentId, searchParams, setSearchParams]);
+
   const assignments = (data?.assignments ?? []) as Assignment[];
 
   const handleDelete = (e: React.MouseEvent, id: string) => {

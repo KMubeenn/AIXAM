@@ -247,15 +247,18 @@ export const useAIGradeSubmission = () => {
 export const usePushGrade = () => {
   return useMutation({
     mutationFn: ({
-      courseId, courseworkId, submissionId, assignedGrade, draftGrade,
+      courseId, courseworkId, submissionId, assignedGrade, draftGrade, studentName, courseworkName, maxPoints,
     }: {
       courseId: string;
       courseworkId: string;
       submissionId: string;
       assignedGrade: number;
       draftGrade?: number;
+      studentName?: string;
+      courseworkName?: string;
+      maxPoints?: number;
     }) =>
-      CoreService.pushGradeToClassroom(courseId, courseworkId, submissionId, assignedGrade, draftGrade),
+      CoreService.pushGradeToClassroom(courseId, courseworkId, submissionId, assignedGrade, draftGrade, studentName, courseworkName, maxPoints),
   });
 };
 

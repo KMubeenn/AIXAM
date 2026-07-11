@@ -363,10 +363,25 @@ export const CoreService = {
     return response.data;
   },
 
-  async pushGradeToClassroom(courseId: string, courseworkId: string, submissionId: string, assignedGrade: number, draftGrade?: number): Promise<PushGradeResult> {
+  async pushGradeToClassroom(
+    courseId: string,
+    courseworkId: string,
+    submissionId: string,
+    assignedGrade: number,
+    draftGrade?: number,
+    studentName?: string,
+    courseworkName?: string,
+    maxPoints?: number
+  ): Promise<PushGradeResult> {
     const response = await api.post(
       `/core/classroom/courses/${courseId}/coursework/${courseworkId}/submissions/${submissionId}/grade/`,
-      { assigned_grade: assignedGrade, ...(draftGrade !== undefined ? { draft_grade: draftGrade } : {}) }
+      {
+        assigned_grade: assignedGrade,
+        ...(draftGrade !== undefined ? { draft_grade: draftGrade } : {}),
+        ...(studentName ? { student_name: studentName } : {}),
+        ...(courseworkName ? { coursework_name: courseworkName } : {}),
+        ...(maxPoints !== undefined ? { max_points: maxPoints } : {})
+      }
     );
     return response.data;
   },

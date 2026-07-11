@@ -66,8 +66,9 @@ const GradeSubmissionModal: React.FC<{
   submission: ClassroomSubmission;
   courseId: string;
   courseworkId: string;
+  courseworkName?: string;
   onClose: () => void;
-}> = ({ submission, courseId, courseworkId, onClose }) => {
+}> = ({ submission, courseId, courseworkId, courseworkName, onClose }) => {
   const fetchContent = useFetchSubmissionContent();
   const pushGrade = usePushGrade();
   const [grade, setGrade] = useState("");
@@ -171,6 +172,9 @@ const GradeSubmissionModal: React.FC<{
                         courseworkId,
                         submissionId: submission.id,
                         assignedGrade: parsed,
+                        studentName: submission.studentName,
+                        courseworkName: courseworkName || "Assignment",
+                        maxPoints: 100, // Google Classroom default/standard
                       });
                       setSuccess(true);
                     } catch (e) {
@@ -474,6 +478,9 @@ const SubmissionsList: React.FC<{
             courseworkId,
             submissionId: sub.id,
             assignedGrade: 0,
+            studentName: sub.studentName,
+            courseworkName: courseworkName || "Assignment",
+            maxPoints: 100,
           });
           continue;
         }
@@ -523,6 +530,9 @@ const SubmissionsList: React.FC<{
           grade_test: true,
           test_submission: submissionsToGrade,
           grading_instructions: gradingInstructions,
+          course_id: courseId,
+          coursework_name: courseworkName || "Assignment",
+          quiz_id: courseworkId,
         },
         (token) => {},
         async (data) => {
@@ -541,6 +551,9 @@ const SubmissionsList: React.FC<{
                     courseworkId,
                     submissionId: g.student_id,
                     assignedGrade: g.marks,
+                    studentName: g.student_name,
+                    courseworkName: courseworkName || "Assignment",
+                    maxPoints: 100,
                   });
                 } catch (e) {
                   console.error(e);
@@ -648,6 +661,7 @@ const SubmissionsList: React.FC<{
           submission={selected}
           courseId={courseId}
           courseworkId={courseworkId}
+          courseworkName={courseworkName}
           onClose={() => setSelected(null)}
         />
       )}

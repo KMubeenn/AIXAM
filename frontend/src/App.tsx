@@ -1,7 +1,6 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import StudentDashboard from "./pages/StudentDashboard/StudentDashboard";
-import TeacherDashboard from "./pages/TeacherDashboard/TeacherDashboard";
 import AnalyticsDashboard from "./pages/Analytics/Analytics";
 import Chat from "./pages/Chat/Chat";
 import FlashcardsPage from "./pages/Flashcards/FlashcardsPage";
@@ -31,7 +30,7 @@ const App: React.FC = () => {
         {/* Home Route (Standalone Layout) */}
         <Route path="/" element={<Home />} />
         <Route path="/student-dashboard" element={<StudentDashboard />} />
-        <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+        <Route path="/teacher-dashboard" element={<Navigate to="/classroom" replace />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/flashcards" element={<FlashcardsPage />} />
@@ -44,8 +43,6 @@ const App: React.FC = () => {
         <Route path="/teacher-quizzes" element={<TeacherQuizzes />} />
         <Route path="/classroom" element={<Classroom />} />
         <Route path="/teacher-profile" element={<TeacherProfile />} />
-
-        {/* Auth Routes */}
 
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>

@@ -144,9 +144,32 @@ async def _persist_structured_output(user_id, output, session_id, study_material
                 feedback=overall_feedback,
                 grading_details=grading_details
             )
+            
+            # Dynamically determine the topic based on test content and existing topics
+            try:
+                perfs = await CoreService.get_student_performance(user_id)
+                
+                # Exclude generic fallbacks so the LLM doesn't merge new specific topics into them
+                banned_existing = ['mixed topics', 'uploaded material', 'general study', 'general']
+                existing_topics = [
+                    p['topic'] for p in perfs 
+                    if p.get('topic') and p['topic'].lower() not in banned_existing
+                ]
+                
+                from apps.chat.services.utilities.TestTopicEvaluator import TestTopicEvaluator
+                evaluator = TestTopicEvaluator()
+                eval_topic = await evaluator.evaluate_topic(data, existing_topics)
+                if eval_topic and eval_topic != "Mixed Topics":
+                    final_topic = eval_topic
+                else:
+                    final_topic = topic
+            except Exception as e:
+                print(f"[Topic Evaluator Error] {e}")
+                final_topic = topic
+
             await CoreService.update_student_performance(
                 student_id=user_id,
-                topic=topic,
+                topic=final_topic,
                 score=score_pct
             )
             metadata = {

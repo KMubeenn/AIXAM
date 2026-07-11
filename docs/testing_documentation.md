@@ -10,13 +10,13 @@ The frontend uses a modern, light, and high-performance testing environment tail
 
 ### 📦 Libraries & Purpose
 
-| Library | Purpose |
-| :--- | :--- |
-| **Vitest** | A Vite-native unit testing framework. It shares the same configuration, plugins, and loaders as the build engine, making it extremely fast. |
+| Library                                              | Purpose                                                                                                                                                     |
+| :--------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Vitest**                                           | A Vite-native unit testing framework. It shares the same configuration, plugins, and loaders as the build engine, making it extremely fast.                 |
 | **React Testing Library (`@testing-library/react`)** | Renders React component trees inside a virtual DOM and exposes utilities to query elements in a user-centric way (e.g. searching by visible roles or text). |
-| **Jest-DOM (`@testing-library/jest-dom`)** | Extends Jest/Vitest matchers with specific assertions for DOM nodes (such as `.toBeInTheDocument()`, `.toBeDisabled()`, or `.toHaveStyle()`). |
-| **User Event (`@testing-library/user-event`)** | Simulates realistic browser mouse clicks, typing, and keyboard interactions, rather than firing raw, unvalidated synthetic events. |
-| **JSDOM** | A pure-JavaScript implementation of web standards (HTML/DOM) that runs in Node, providing a simulated browser environment for tests. |
+| **Jest-DOM (`@testing-library/jest-dom`)**           | Extends Jest/Vitest matchers with specific assertions for DOM nodes (such as `.toBeInTheDocument()`, `.toBeDisabled()`, or `.toHaveStyle()`).               |
+| **User Event (`@testing-library/user-event`)**       | Simulates realistic browser mouse clicks, typing, and keyboard interactions, rather than firing raw, unvalidated synthetic events.                          |
+| **JSDOM**                                            | A pure-JavaScript implementation of web standards (HTML/DOM) that runs in Node, providing a simulated browser environment for tests.                        |
 
 ### 🚀 How to Run Frontend Tests
 
@@ -38,10 +38,10 @@ The backend testing suite targets Django models, asynchronous ASGI view routes, 
 
 ### 📦 Libraries & Purpose
 
-| Library | Purpose |
-| :--- | :--- |
-| **Pytest** | A powerful and expressive testing framework for Python, used as the primary runner and fixture coordinator. |
-| **Pytest-Django** | Hooks Pytest into the Django lifecycle, automating transaction handling, client setup, and settings overrides. |
+| Library            | Purpose                                                                                                                                      |
+| :----------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pytest**         | A powerful and expressive testing framework for Python, used as the primary runner and fixture coordinator.                                  |
+| **Pytest-Django**  | Hooks Pytest into the Django lifecycle, automating transaction handling, client setup, and settings overrides.                               |
 | **Pytest-Asyncio** | Enforces async test runners via the `@pytest.mark.asyncio` decorator, which is required for AIXAM's asynchronous agent nodes and ASGI tasks. |
 
 ### 🚀 How to Run Backend Tests
@@ -60,7 +60,7 @@ uv run pytest apps/chat/tests/test_teacher_agent.py -k "test_orchestrator"
 ```
 
 > [!NOTE]
-> **Supabase Cloud Database Mocking/Bypass:** 
+> **Supabase Cloud Database Mocking/Bypass:**
 > Automated tests that require fresh database transactions are skipped (`@pytest.mark.skip`) during normal runs. This is because Supabase's remote Connection Pooler enforces connection limits and blocks dynamic local creation/destruction of transient test databases.
 
 ---
@@ -71,9 +71,9 @@ Because LLM outputs are inherently non-deterministic, unit tests are insufficien
 
 ### 📦 Tools & Purpose
 
-| Library / Tool | Purpose |
-| :--- | :--- |
-| **LangSmith SDK** | Tracks LLM execution traces, input/output token payloads, and API call latency. |
+| Library / Tool                                    | Purpose                                                                                                                                                                                                                                                                   |
+| :------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **LangSmith SDK**                                 | Tracks LLM execution traces, input/output token payloads, and API call latency.                                                                                                                                                                                           |
 | **Custom Eval Runner (`tests/run_llm_evals.py`)** | A custom pipeline script that programmatically runs test inputs through the LangGraph agents, parsing and verifying that the structure, fields, and output data formats conform to Pydantic rules (e.g. verifying quiz options are valid JSON, slides have titles, etc.). |
 
 ### 🚀 How to Run AI Evaluations

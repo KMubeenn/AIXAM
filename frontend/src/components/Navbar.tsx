@@ -67,7 +67,7 @@ const Navbar: React.FC = () => {
                 <Link
                   to={
                     user?.role === "teacher"
-                      ? "/teacher-dashboard"
+                      ? "/classroom"
                       : "/student-dashboard"
                   }
                   className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
@@ -148,7 +148,7 @@ const Navbar: React.FC = () => {
                       <Link
                         to={
                           user?.role === "teacher"
-                            ? "/teacher-dashboard"
+                            ? "/classroom"
                             : "/student-dashboard"
                         }
                         onClick={() => setIsDropdownOpen(false)}

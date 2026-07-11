@@ -11,6 +11,10 @@ export interface ChatRequest {
   files?: File[];
   study_material_id?: string;
   direct_task?: string;
+  /** Google Classroom course ID — used to link batch grades to the right local Assignment */
+  course_id?: string;
+  /** Classroom coursework title — used to find/create the local Assignment mirror */
+  coursework_name?: string;
 }
 
 export interface ChatMessage {

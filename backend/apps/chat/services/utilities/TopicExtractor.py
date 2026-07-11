@@ -1,4 +1,5 @@
 import os
+import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.messages import SystemMessage, HumanMessage
 
@@ -26,12 +27,28 @@ class TopicExtractor:
         try:
             response = await self.llm.ainvoke([self.prompt, HumanMessage(content=text)])
             topic = response.content.strip().strip("'").strip('"')
-            # If the model failed and still returned a banned word, clean it up
+            
+            # 1. Define the banned words
+            banned_words = ['flashcard', 'flashcards', 'quiz', 'quizzes', 'test', 'tests', 'assignment', 'document', 'pdf', 'general study']
+            
+            # 2. Create a case-insensitive regex pattern to strip only the banned words out
+            pattern = re.compile(r'\b(?:' + '|'.join(banned_words) + r')\b', re.IGNORECASE)
+            
+            # 3. Remove banned words and any extra whitespace
+            cleaned_topic = pattern.sub('', topic).strip()
+            
+            # 4. Remove any stray punctuation (like a trailing dash or colon) that might be left behind
+            cleaned_topic = re.sub(r'^[^\w]+|[^\w]+$', '', cleaned_topic).strip()
+            
+            if cleaned_topic:
+                # If we still have words left, return them nicely capitalized
+                return cleaned_topic.title()
+                
+            # 5. If the topic is completely empty after cleaning
             lower_topic = topic.lower()
-            if any(banned in lower_topic for banned in ['flashcard', 'quiz', 'test', 'assignment', 'document', 'pdf', 'general study']):
-                if 'uploaded' in lower_topic or 'material' in lower_topic:
-                    return "Uploaded Material"
-                return "Mixed Topics"
-            return topic if topic else "Mixed Topics"
+            if 'uploaded' in lower_topic or 'material' in lower_topic:
+                return "Uploaded Material"
+                
+            return "Mixed Topics"
         except:
             return "Mixed Topics"

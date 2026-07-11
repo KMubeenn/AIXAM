@@ -23,7 +23,7 @@ const LoginT: React.FC = () => {
   React.useEffect(() => {
     if (isAuthenticated && user) {
       if (user.role === "teacher") {
-        navigate("/teacher-dashboard");
+        navigate("/classroom");
       } else if (user.role === "student") {
         clearAuth();
         setError("This account is for Students. Please use the Student Login.");
@@ -44,7 +44,7 @@ const LoginT: React.FC = () => {
 
       if (user.role === "teacher") {
         setAuth(user, response.token);
-        navigate("/teacher-dashboard");
+        navigate("/classroom");
       } else {
         setError("This account is for Students. Please use the Student Login.");
       }

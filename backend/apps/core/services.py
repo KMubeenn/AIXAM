@@ -283,6 +283,12 @@ class CoreService:
             perf.average_score=(total+score)/perf.tests_taken
             perf.strength_score=perf.average_score
             perf.save(update_fields=['average_score','tests_taken','strength_score','last_updated'])
+            
+        # Invalidate the insights cache automatically on any update
+        from django.core.cache import cache
+        cache_key = f'student_insights_{student_id}'
+        cache.delete(cache_key)
+        
         return perf
 
     @staticmethod

@@ -1,16 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import Sidebar from "../StudentDashboard/components/Sidebar";
 import Header from "../StudentDashboard/components/Header";
 import { useProfile } from "../../hooks/useUser";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../services/api";
 import ChangePassword from "../../components/ChangePassword";
-import { LuUser, LuMail, LuCalendarClock } from "react-icons/lu";
+import { LuUser, LuMail, LuCalendarClock, LuTrash2, LuX } from "react-icons/lu";
 import { AuthService } from "../../services/auth.service";
+import { useAuthStore } from "../../store/useAuthStore";
 import toast from "react-hot-toast";
 
 const StudentProfile: React.FC = () => {
   const { data: profile, isLoading: isProfileLoading } = useProfile();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
   
   const getInitials = (first?: string, last?: string) => {
     if (!first) return "S";
@@ -18,15 +21,15 @@ const StudentProfile: React.FC = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (window.confirm("Are you absolutely sure you want to delete your account? This action cannot be undone.")) {
-      try {
-        await AuthService.deleteAccount();
-        toast.success("Account deleted successfully");
-        localStorage.removeItem("token");
-        window.location.href = "/";
-      } catch (e: any) {
-        toast.error(e.message || "Failed to delete account");
-      }
+    try {
+      await AuthService.deleteAccount();
+      toast.success("Account deleted successfully");
+      clearAuth();
+      window.location.href = "/";
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete account");
+    } finally {
+      setShowDeleteModal(false);
     }
   };
 
@@ -86,7 +89,7 @@ const StudentProfile: React.FC = () => {
                   Once you delete your account, there is no going back. Please be certain.
                 </p>
                 <button
-                  onClick={handleDeleteAccount}
+                  onClick={() => setShowDeleteModal(true)}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                 >
                   Delete Account
@@ -97,6 +100,41 @@ const StudentProfile: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Styled React Confirmation Modal for Deletion */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <LuX className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-4">
+              <LuTrash2 className="w-6 h-6" />
+              <h3 className="text-lg font-bold">Delete Account</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-slate-400 mb-6">
+              Are you absolutely sure you want to delete your account? This action is permanent and cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                className="px-4 py-2 text-sm font-semibold rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm"
+              >
+                Yes, Delete Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
