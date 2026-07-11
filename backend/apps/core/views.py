@@ -8,11 +8,6 @@ from asgiref.sync import sync_to_async
 
 import json
 
-
-# ──────────────────────────────────────────────
-# TEACHER ANALYTICS
-# ──────────────────────────────────────────────
-
 @csrf_exempt
 @require_http_methods(['GET'])
 async def get_teacher_analytics_view(request):
@@ -693,11 +688,19 @@ async def get_assignment_submissions(request, assignment_id):
         submissions = await sync_to_async(list)(
             Submission.objects.filter(assignment=assignment).select_related('student')
         )
-        
+
+        def _display_name(s):
+            details = s.grading_details or {}
+            if isinstance(details, dict):
+                stored = details.get('student_name')
+                if stored:
+                    return stored
+            return f"{s.student.first_name} {s.student.last_name}".strip() or s.student.username
+
         data = [{
             "id": str(s.id),
             "student_id": str(s.student.id),
-            "student_name": s.student.username,
+            "student_name": _display_name(s),
             "score": s.score,
             "feedback": s.feedback,
             "is_late": s.is_late,
@@ -844,7 +847,11 @@ async def fetch_submission_content_view(request, course_id, coursework_id, submi
 async def patch_grade_view(request, course_id, coursework_id, submission_id):
     """
     Push a grade back to Google Classroom for a specific student submission.
-    Body: { "assigned_grade": float, "draft_grade": float (optional) }
+    Also syncs the grade to the local database so that teacher analytics
+    (class average, students graded) reflect all graded submissions.
+    Body: { "assigned_grade": float, "draft_grade": float (optional),
+            "student_name": str (optional), "coursework_name": str (optional),
+            "max_points": float (optional) }
     """
     try:
         user = await sync_to_async(get_user_from_request)(request=request)
@@ -853,14 +860,90 @@ async def patch_grade_view(request, course_id, coursework_id, submission_id):
         body = json.loads(request.body)
         assigned_grade = body.get('assigned_grade')
         draft_grade = body.get('draft_grade', None)
+        student_name = body.get('student_name', '')
+        coursework_name = body.get('coursework_name', '')
+        max_points = float(body.get('max_points') or 100.0)
         if assigned_grade is None:
             return JsonResponse({'error': 'assigned_grade is required'}, status=400)
+
         from apps.chat.services.utilities.ClassroomService import ClassroomService, ClassroomServiceError
         result = await sync_to_async(ClassroomService.patch_grade)(
             user, course_id, coursework_id, submission_id,
             float(assigned_grade),
             float(draft_grade) if draft_grade is not None else None
         )
+
+        # ── Persist grade locally for analytics ────────────────────────────────
+        try:
+            import uuid as _uuid
+            from apps.core.models import Assignment, Submission
+            from apps.users.models import User as UserModel
+
+            # 1. Resolve or create the local Assignment mirror
+            assignment = await sync_to_async(
+                lambda: Assignment.objects.filter(
+                    created_by_id=user.id,
+                    course_id=course_id,
+                    title=coursework_name
+                ).first() if coursework_name else Assignment.objects.filter(
+                    created_by_id=user.id,
+                    course_id=course_id
+                ).first()
+            )()
+
+            if assignment is None and coursework_name:
+                assignment = await sync_to_async(Assignment.objects.create)(
+                    title=coursework_name,
+                    description=f"Google Classroom assignment: {coursework_name}",
+                    created_by_id=user.id,
+                    course_id=course_id,
+                    total_marks=max_points,
+                )
+
+            if assignment is not None:
+                # 2. Detect local UUID vs Classroom string ID
+                is_local_uuid = True
+                try:
+                    _uuid.UUID(submission_id)
+                except ValueError:
+                    is_local_uuid = False
+
+                if is_local_uuid:
+                    student = await sync_to_async(
+                        lambda: UserModel.objects.filter(id=submission_id).first()
+                    )()
+                else:
+                    classroom_username = f"classroom_{submission_id}"
+                    student, _ = await sync_to_async(UserModel.objects.get_or_create)(
+                        username=classroom_username,
+                        defaults={
+                            'role': 'student',
+                            'is_active': True,
+                            'first_name': student_name or 'Student',
+                        }
+                    )
+
+                if student is not None:
+                    # Score as percentage
+                    score_pct = (float(assigned_grade) / max_points * 100) if max_points > 0 else float(assigned_grade)
+                    await sync_to_async(Submission.objects.update_or_create)(
+                        student=student,
+                        assignment=assignment,
+                        defaults={
+                            'score': score_pct,
+                            'quiz': assignment.quiz,
+                            'grading_details': {
+                                'student_name': student_name or student.first_name or student.username,
+                                'classroom_student_id': submission_id if not is_local_uuid else None,
+                                'raw_score': float(assigned_grade),
+                                'total_marks': max_points,
+                            },
+                        }
+                    )
+        except Exception as sync_err:
+            # Non-fatal: log but don't fail the grade push response
+            print(f"[patch_grade_view] Local DB sync failed (non-fatal): {sync_err}")
+
         return JsonResponse({'message': 'Grade synced to Google Classroom', 'result': result})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

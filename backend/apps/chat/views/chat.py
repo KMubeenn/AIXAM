@@ -100,6 +100,9 @@ async def agent_endpoint(request):
         quiz_id=data.get('quiz_id',None)
         grading_instructions=data.get('grading_instructions',None)
         direct_task=data.get('direct_task',None)
+        # Classroom context — used to associate batch grades with the right local Assignment
+        course_id=data.get('course_id',None)
+        coursework_name=data.get('coursework_name',None)
 
         response=StreamingHttpResponse(
             generate_response_with_persistence(
@@ -112,7 +115,9 @@ async def agent_endpoint(request):
                 study_material_id=study_material_id,
                 quiz_id=quiz_id,
                 grading_instructions=grading_instructions,
-                direct_task=direct_task
+                direct_task=direct_task,
+                course_id=course_id,
+                coursework_name=coursework_name,
             )
         )
         response['cache-control']='no-cache'

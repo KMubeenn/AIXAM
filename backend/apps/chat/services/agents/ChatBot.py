@@ -155,9 +155,15 @@ class Agent():
             doc_format = doc.get('format', '').upper()
             task_done.append(f"{doc_format} document" if doc_format else "document")
 
+        if final_state.get('classroom_upload_result'):
+            results = final_state['classroom_upload_result']
+            if isinstance(results, list) and len(results) > 0:
+                success_count = sum(1 for r in results if r.get('status') == 'success')
+                task_done.append(f"posted to {success_count} classroom(s)")
+
         if task_done:
             task_list = " and ".join(task_done)
-            confirm_msg = f"\nI have successfully generated your {task_list}! Let me know if you need anything else."
+            confirm_msg = f"\nI have successfully {task_list}! Let me know if you need anything else."
             # Only emit the confirm message when no conversational text was streamed.
             # If the LLM already replied in text (e.g. tool-result handling), skip this
             # to prevent the response from appearing twice.

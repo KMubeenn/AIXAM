@@ -316,7 +316,7 @@ class CoreService:
 
     @staticmethod
     @sync_to_async
-    def save_assignment(user_id, title, description, questions, deadline=None, total_marks=100.0, study_material_id=None, course_id=None):
+    def save_assignment(user_id, title, description, questions, deadline=None, total_marks=100.0, study_material_id=None, course_id=None, objective='', submission_requirements=''):
         from apps.core.models import Assignment, Quiz, Question
         
         quiz = Quiz.objects.create(
@@ -329,7 +329,16 @@ class CoreService:
         
         q_objs = []
         for q in questions:
-            q_text = f"{q.get('question', '')} \n\nRUBRIC: {q.get('rubric', '')}"
+            tasks_text = ''
+            deliverables_text = ''
+            tasks = q.get('tasks', [])
+            deliverables = q.get('deliverables', [])
+            if tasks:
+                tasks_text = '\n\nTASKS:\n' + '\n'.join(f'- {t}' for t in tasks)
+            if deliverables:
+                deliverables_text = '\n\nDELIVERABLES:\n' + '\n'.join(f'- {d}' for d in deliverables)
+            rubric_text = f'\n\nRUBRIC: {q.get("rubric", "")}' if q.get('rubric') else ''
+            q_text = f"{q.get('question', '')}{tasks_text}{deliverables_text}{rubric_text}"
             marks = q.get('marks', 1.0)
             q_objs.append(Question(
                 quiz=quiz,
@@ -339,10 +348,17 @@ class CoreService:
             ))
         if q_objs:
             Question.objects.bulk_create(q_objs)
+        
+        # Build a rich description that includes objective and submission requirements
+        full_description = description
+        if objective:
+            full_description = f"Objective: {objective}\n\n{full_description}"
+        if submission_requirements:
+            full_description += f"\n\nSubmission Requirements:\n{submission_requirements}"
             
         assignment = Assignment.objects.create(
             title=title,
-            description=description,
+            description=full_description,
             created_by_id=user_id,
             deadline=deadline,
             total_marks=total_marks,
@@ -365,79 +381,164 @@ class CoreService:
         )
         
         for q in questions:
+            q_type = q.get('question_type', 'mcq')
             q_obj = Question.objects.create(
                 quiz=quiz,
                 text=f"{q.get('question', '')} \n\nEXPLANATION: {q.get('explanation', '')}",
-                question_type='mcq',
+                question_type=q_type,
                 points=q.get('points', 1)
             )
-            choices_to_create = []
-            correct_key = q.get('answer', '').upper()
-            options = q.get('options', {})
-            for key, val in options.items():
-                is_correct = (key.upper() == correct_key)
-                choices_to_create.append(Choice(
-                    question=q_obj,
-                    text=f"{key}) {val}",
-                    is_correct=is_correct
-                ))
-            if choices_to_create:
-                Choice.objects.bulk_create(choices_to_create)
+            
+            if q_type == 'mcq':
+                choices_to_create = []
+                correct_key = q.get('answer', '').upper()
+                options = q.get('options', {})
+                for key, val in options.items():
+                    is_correct = (key.upper() == correct_key)
+                    choices_to_create.append(Choice(
+                        question=q_obj,
+                        text=f"{key}) {val}",
+                        is_correct=is_correct
+                    ))
+                if choices_to_create:
+                    Choice.objects.bulk_create(choices_to_create)
                 
         return str(quiz.id)
 
     @staticmethod
     @sync_to_async
-    def save_batch_grades(teacher_id, assignment_id, grades_data):
+    def save_batch_grades(teacher_id, assignment_id, grades_data, course_id=None, coursework_name=None):
+        """
+        Persist batch-graded submissions locally so that teacher analytics can aggregate them.
+
+        Works for both:
+        - Local AIXAM assignments (assignment_id is a valid UUID in the DB)
+        - Google Classroom grading flows (assignment_id may be None/invalid; we use course_id +
+          coursework_name to find or create a local Assignment mirror).
+
+        For Classroom students, whose IDs are Google string identifiers rather than local UUIDs,
+        we get-or-create a lightweight placeholder User (role='student') keyed by username
+        'classroom_<student_id>' and store the human-readable name in grading_details.
+        """
+        import uuid as _uuid
         from apps.core.models import Submission, Assignment, StudentPerformance
         from apps.users.models import User
-        try:
-            assignment = Assignment.objects.get(id=assignment_id)
-        except:
-            return None
-            
+
+        # ── 1. Resolve the local Assignment ──────────────────────────────────
+        assignment = None
+
+        # Try direct UUID lookup first
+        if assignment_id:
+            try:
+                _uuid.UUID(str(assignment_id))  # validate it's a UUID
+                assignment = Assignment.objects.filter(id=assignment_id).first()
+            except (ValueError, AttributeError):
+                pass
+
+        # Fall back to course_id + coursework_name lookup or creation
+        if assignment is None:
+            if course_id and coursework_name:
+                assignment = Assignment.objects.filter(
+                    created_by_id=teacher_id,
+                    course_id=course_id,
+                    title=coursework_name
+                ).first()
+
+                if assignment is None:
+                    # Create a lightweight local mirror of the Classroom coursework
+                    assignment = Assignment.objects.create(
+                        title=coursework_name,
+                        description=f"Google Classroom assignment: {coursework_name}",
+                        created_by_id=teacher_id,
+                        course_id=course_id,
+                        total_marks=100.0,
+                    )
+            else:
+                # Cannot resolve — nothing to save against
+                return None
+
         grades = grades_data.get('grades', [])
-        
+
+        # ── 2. Aggregate per-student scores & feedback ────────────────────────
         student_scores = {}
         student_feedback = {}
+        student_names = {}
         for g in grades:
-            sid = g.get('student_id')
+            sid = str(g.get('student_id', '')).strip()
             if not sid:
                 continue
             student_scores[sid] = student_scores.get(sid, 0) + g.get('marks', 0)
             fb = g.get('feedback', '')
             if fb:
                 student_feedback[sid] = student_feedback.get(sid, '') + "\n" + fb
-                
+            # Capture human-readable name provided by the grading payload
+            name = g.get('student_name', '')
+            if name and sid not in student_names:
+                student_names[sid] = name
+
+        # ── 3. Persist one Submission row per student ─────────────────────────
         for sid, total_score in student_scores.items():
             try:
-                student = User.objects.get(id=sid)
+                # Detect whether sid is a local UUID or a Classroom string ID
+                is_local_uuid = True
+                try:
+                    _uuid.UUID(sid)
+                except ValueError:
+                    is_local_uuid = False
+
+                if is_local_uuid:
+                    student = User.objects.filter(id=sid).first()
+                    if student is None:
+                        continue  # unknown local UUID — skip
+                else:
+                    # Classroom student — get or create a placeholder account
+                    classroom_username = f"classroom_{sid}"
+                    student, _ = User.objects.get_or_create(
+                        username=classroom_username,
+                        defaults={
+                            'role': 'student',
+                            'is_active': True,
+                            'first_name': student_names.get(sid, 'Student'),
+                        }
+                    )
+
+                # Normalise score as a percentage against total_marks
+                total_marks = assignment.total_marks or 100.0
+                score_pct = (total_score / total_marks * 100) if total_marks > 0 else total_score
+
                 Submission.objects.update_or_create(
                     student=student,
                     assignment=assignment,
                     defaults={
-                        'score': total_score,
+                        'score': score_pct,
                         'feedback': student_feedback.get(sid, '').strip(),
-                        'quiz': assignment.quiz
+                        'quiz': assignment.quiz,
+                        'grading_details': {
+                            'student_name': student_names.get(sid, student.first_name or student.username),
+                            'classroom_student_id': sid if not is_local_uuid else None,
+                            'raw_score': total_score,
+                            'total_marks': total_marks,
+                        },
                     }
                 )
-                
-                # Update generic performance
+
+                # Update generic student performance
                 perf, created = StudentPerformance.objects.get_or_create(
                     student=student,
                     topic=assignment.title,
-                    defaults={'average_score': total_score, 'tests_taken': 1, 'strength_score': total_score}
+                    defaults={'average_score': score_pct, 'tests_taken': 1, 'strength_score': score_pct}
                 )
                 if not created:
-                    total = perf.average_score * perf.tests_taken
+                    running_total = perf.average_score * perf.tests_taken
                     perf.tests_taken += 1
-                    perf.average_score = (total + total_score) / perf.tests_taken
+                    perf.average_score = (running_total + score_pct) / perf.tests_taken
                     perf.strength_score = perf.average_score
                     perf.save(update_fields=['average_score', 'tests_taken', 'strength_score', 'last_updated'])
-            except:
-                pass
-                
-        return str(assignment_id)
+
+            except Exception as e:
+                print(f"[save_batch_grades] Failed to save grade for student {sid}: {e}")
+
+        return str(assignment.id)
 
     @staticmethod
     @sync_to_async
@@ -468,6 +569,7 @@ class CoreService:
         from apps.core.models import Quiz
         quizzes = list(
             Quiz.objects.filter(created_by_id=user_id, quiz_type='assignment_quiz')
+            .filter(assignments__isnull=True)
             .prefetch_related('questions')
             .order_by('-created_at')[:50]
         )
@@ -489,14 +591,30 @@ class CoreService:
             .select_related('student')
             .order_by('-submitted_at')
         )
-        return [{
-            'id': str(s.id),
-            'student_id': str(s.student.id),
-            'student_name': f"{s.student.first_name} {s.student.last_name}".strip() or s.student.username,
-            'student_email': s.student.email,
-            'score': s.score,
-            'feedback': s.feedback,
-            'is_late': s.is_late,
-            'submitted_at': s.submitted_at.isoformat(),
-            'grading_details': s.grading_details or [],
-        } for s in submissions]
+        result = []
+        for s in submissions:
+            # Prefer the human-readable name stored at grading time (e.g. for Classroom students)
+            details = s.grading_details or {}
+            if isinstance(details, list):
+                # Legacy format — grading_details was a list of per-question breakdowns
+                stored_name = None
+            else:
+                stored_name = details.get('student_name')
+
+            display_name = (
+                stored_name
+                or f"{s.student.first_name} {s.student.last_name}".strip()
+                or s.student.username
+            )
+            result.append({
+                'id': str(s.id),
+                'student_id': str(s.student.id),
+                'student_name': display_name,
+                'student_email': s.student.email,
+                'score': s.score,
+                'feedback': s.feedback,
+                'is_late': s.is_late,
+                'submitted_at': s.submitted_at.isoformat(),
+                'grading_details': s.grading_details or [],
+            })
+        return result

@@ -13,7 +13,7 @@ def estimate_tokens(input:str)->int:
 
 
 
-async def generate_response_with_persistence(chat_agent,session_id,message,user_id=None,grade_test=False,test_submission=None,study_material_id=None,quiz_id=None,grading_instructions=None,direct_task=None):
+async def generate_response_with_persistence(chat_agent,session_id,message,user_id=None,grade_test=False,test_submission=None,study_material_id=None,quiz_id=None,grading_instructions=None,direct_task=None,course_id=None,coursework_name=None):
     chat_persistence=ChatPersistenceService()
     query=message[-1].content
     await chat_persistence.update_messages(session_id=session_id,role="user",content=query)
@@ -34,7 +34,7 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
             else:
                 print(f"[DEBUG ChatService] Yielding structured: {output['type']}")
                 if user_id:
-                    record_id, metadata = await _persist_structured_output(user_id,output,session_id,study_material_id,quiz_id)
+                    record_id, metadata = await _persist_structured_output(user_id,output,session_id,study_material_id,quiz_id,course_id=course_id,coursework_name=coursework_name)
                     if record_id:
                         output['record_id']=record_id
                     if metadata:
@@ -74,7 +74,7 @@ async def generate_response_with_persistence(chat_agent,session_id,message,user_
         raise e
 
 
-async def _persist_structured_output(user_id, output, session_id, study_material_id=None, quiz_id=None):
+async def _persist_structured_output(user_id, output, session_id, study_material_id=None, quiz_id=None, course_id=None, coursework_name=None):
     """Persist structured output to DB. Returns (record_id, metadata) tuple."""
     output_type = output.get('type')
     data = output.get('data')
@@ -177,10 +177,12 @@ async def _persist_structured_output(user_id, output, session_id, study_material
             record_id = await CoreService.save_assignment(
                 user_id=user_id,
                 title=data.get('title', f"{topic} Assignment"),
-                description=f"Generated assignment for {topic}",
+                description=data.get('description', ''),
                 questions=data.get('questions', []),
                 total_marks=data.get('total_marks', 100),
-                study_material_id=study_material_id
+                study_material_id=study_material_id,
+                objective=data.get('objective', ''),
+                submission_requirements=data.get('submission_requirements', ''),
             )
         elif output_type == 'teacher_quiz':
             record_id = await CoreService.save_teacher_quiz(
@@ -193,7 +195,9 @@ async def _persist_structured_output(user_id, output, session_id, study_material
             record_id = await CoreService.save_batch_grades(
                 teacher_id=user_id,
                 assignment_id=quiz_id,
-                grades_data=data
+                grades_data=data,
+                course_id=course_id,
+                coursework_name=coursework_name,
             )
 
         # Build metadata for types that should persist in chat history
@@ -215,7 +219,7 @@ async def _persist_structured_output(user_id, output, session_id, study_material
             if output_type == 'assignment':
                 metadata['extra_details'] = {
                     'title': title,
-                    'description': f"Generated assignment for {topic}",
+                    'description': data.get('description', ''),
                     'max_points': data.get('total_marks', 100)
                 }
 

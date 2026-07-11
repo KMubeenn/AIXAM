@@ -19,18 +19,23 @@ from apps.chat.services.utilities.LLMRouter import invoke_with_fallback
 class AssignmentQuestion(TypedDict, total=False):
     id: int
     question: str
+    tasks: list[str]
+    deliverables: list[str]
     marks: float
     rubric: str
 
 class GeneratedAssignment(TypedDict, total=False):
     title: str
     subject: str
+    objective: str
     total_marks: float
     questions: list[AssignmentQuestion]
+    submission_requirements: str
 
 class TeacherQuizQuestion(TypedDict, total=False):
     id: int
     question: str
+    question_type: str # 'mcq' or 'descriptive'
     options: dict[str, str]
     answer: str
     points: int
@@ -335,13 +340,23 @@ class TeacherAgent:
                         existing = state['assignment']
                         step_outputs[step['step']] = {
                             "title": existing.get('title'),
-                            "questions": existing.get('questions', [])
+                            "objective": existing.get('objective', ''),
+                            "submission_requirements": existing.get('submission_requirements', ''),
+                            "questions": existing.get('questions', []),
+                            "max_points": existing.get('total_marks'),
                         }
                     else:
                         # Genuinely no assignment exists — generate a new one
                         output = self._generate_assignment(state)
                         final_state.update(output)
-                        step_outputs[step['step']] = {"title": output['assignment'].get('title'), "questions": output['assignment'].get('questions', [])}
+                        a = output['assignment']
+                        step_outputs[step['step']] = {
+                            "title": a.get('title'),
+                            "objective": a.get('objective', ''),
+                            "submission_requirements": a.get('submission_requirements', ''),
+                            "questions": a.get('questions', []),
+                            "max_points": a.get('total_marks'),
+                        }
                         llm_calls += 1
 
                 elif task == 'teacher_quiz':
@@ -367,13 +382,50 @@ class TeacherAgent:
 
                 elif task == 'post_to_classroom':
                     # Post the previously generated assignment/quiz directly to Google Classroom
-                    # Uses ClassroomService directly — no file attachment, pure text-based assignment
                     course_ids = step.get('course_ids') or []
                     source_step = depends_on
                     source_data = step_outputs.get(source_step) if source_step else None
 
+                    # SCENARIO B: no depends_on step — load the most recent assignment from DB
                     if not source_data:
-                        print("[TeacherAgent] post_to_classroom: no source data found from depends_on step.")
+                        try:
+                            from langgraph.config import get_config
+                            cfg = get_config()
+                            thread_id = cfg.get("configurable", {}).get("thread_id")
+                            if thread_id:
+                                from apps.chat.models import Message as ChatMessage
+                                from apps.core.models import Assignment as AssignmentModel
+                                latest_msg = ChatMessage.objects.filter(
+                                    session_id=thread_id,
+                                    role='assistant',
+                                    metadata__type='assignment'
+                                ).order_by('-sequence_number').first()
+                                if latest_msg and latest_msg.metadata:
+                                    rec_id = latest_msg.metadata.get('record_id')
+                                    if rec_id:
+                                        db_assignment = AssignmentModel.objects.select_related('quiz').prefetch_related('quiz__questions').get(id=rec_id)
+                                        questions_list = []
+                                        if db_assignment.quiz:
+                                            for q in db_assignment.quiz.questions.all():
+                                                questions_list.append({
+                                                    'question': q.text,
+                                                    'tasks': [],
+                                                    'marks': q.points,
+                                                    'rubric': getattr(q, 'rubric', ''),
+                                                })
+                                        source_data = {
+                                            'title': db_assignment.title,
+                                            'objective': db_assignment.description,
+                                            'questions': questions_list,
+                                            'max_points': db_assignment.total_marks or 100,
+                                            'submission_requirements': '',
+                                        }
+                                        print(f"[TeacherAgent] post_to_classroom: loaded existing assignment '{db_assignment.title}' from DB (SCENARIO B).")
+                        except Exception as e:
+                            print(f"[TeacherAgent] post_to_classroom: DB fallback failed: {e}")
+
+                    if not source_data:
+                        print("[TeacherAgent] post_to_classroom: no source data found. Cannot post.")
                     elif not course_ids:
                         print("[TeacherAgent] post_to_classroom: no course_ids provided.")
                     else:
@@ -387,17 +439,37 @@ class TeacherAgent:
                         except Exception:
                             user_id = None
 
-                        classroom_results = []
                         title = source_data.get('title', 'Assignment')
                         questions = source_data.get('questions', [])
-                        description = f"Please complete the following assignment: {title}"
-                        max_points = sum(q.get('marks', q.get('points', 10)) for q in questions) or 100
+                        objective = source_data.get('objective', '')
+                        submission_requirements = source_data.get('submission_requirements', '')
+                        max_points = source_data.get('max_points') or (sum(q.get('marks', q.get('points', 10)) for q in questions) if questions else 100)
 
+                        # Build full description with all assignment content
+                        desc_parts = []
+                        if objective:
+                            desc_parts.append(f"Objective:\n{objective}")
+                        for i, q in enumerate(questions, 1):
+                            q_text = q.get('question', q.get('text', ''))
+                            q_marks = q.get('marks', q.get('points', ''))
+                            q_tasks = q.get('tasks', [])
+                            q_rubric = q.get('rubric', '')
+                            q_block = f"Q{i}. {q_text} [{q_marks} marks]"
+                            if q_tasks:
+                                q_block += "\n" + "\n".join(f"  - {t}" for t in q_tasks)
+                            if q_rubric:
+                                q_block += f"\n  Rubric: {q_rubric}"
+                            desc_parts.append(q_block)
+                        if submission_requirements:
+                            desc_parts.append(f"Submission Requirements:\n{submission_requirements}")
+                        description = "\n\n".join(desc_parts) if desc_parts else f"Please complete the following assignment: {title}"
+
+                        classroom_results = []
                         if user_id:
                             try:
                                 user = User.objects.get(id=user_id)
                                 for course_id in course_ids:
-                                    result = ClassroomService.post_assignment(
+                                    ClassroomService.post_assignment(
                                         user=user,
                                         course_id=course_id,
                                         title=title,

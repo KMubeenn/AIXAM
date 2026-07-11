@@ -286,7 +286,8 @@ class Submission(models.Model):
     def save(self, *args, **kwargs):
         # Auto-mark zero if late (SRS 2.2)
         # Use timezone.now() since submitted_at isn't set until super().save()
-        if self.assignment and timezone.now() > self.assignment.deadline:
+        # Guard against assignment.deadline being None (e.g. Classroom mirror assignments)
+        if self.assignment and self.assignment.deadline and timezone.now() > self.assignment.deadline:
             self.is_late = True
             self.score = 0
         super().save(*args, **kwargs)

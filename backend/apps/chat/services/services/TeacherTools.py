@@ -40,6 +40,7 @@ class TeacherTools():
 
         Rules:
         - Steps execute in order.
+        - Synonyms like "create", "generate", "make", "design", "build", "formulate" an assignment/quiz/slides are all direct commands that MUST trigger this tool.
         - If the user wants a presentation or slides, ALWAYS plan a "slide_outline" step first, followed by a "generate_pptx" step that depends on the slide outline step.
         - If the user wants content exported as a document, create the content step first, then a document step that depends on it.
         - If the user wants to generate a document from arbitrary text or an uploaded file, schedule ONLY the generate task with depends_on: null.
@@ -49,6 +50,7 @@ class TeacherTools():
 
         Examples:
         - "Create an assignment on databases" -> steps='[{"step": 1, "task": "assignment", "depends_on": null}]'
+        - "generate an assignment on machine learning" -> steps='[{"step": 1, "task": "assignment", "depends_on": null}]'
         - "Create an assignment on LLMs and post to course 123 and 456" -> steps='[{"step": 1, "task": "assignment", "depends_on": null}, {"step": 2, "task": "post_to_classroom", "depends_on": 1, "course_ids": ["123", "456"]}]'
         - "Quiz on ML and export as PDF" -> steps='[{"step": 1, "task": "teacher_quiz", "depends_on": null}, {"step": 2, "task": "generate_pdf", "depends_on": 1}]'
         - "Create a presentation on humans" -> steps='[{"step": 1, "task": "slide_outline", "depends_on": null}, {"step": 2, "task": "generate_pptx", "depends_on": 1}]'
