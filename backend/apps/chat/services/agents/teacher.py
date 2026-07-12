@@ -133,6 +133,8 @@ class TeacherAgent:
         return messages
 
     def entry_router(self, state: TeacherState):
+        if state.get('direct_task'):
+            return "direct_task"
         if state.get('grade_submissions'):
             return "grade"
         return "conversation"
@@ -191,6 +193,22 @@ class TeacherAgent:
         )
         current_calls = state.get('llm_calls', 0)
         return {"batch_grades": result, "llm_calls": current_calls + 1}
+
+    def direct_task_node(self, state: TeacherState):
+        task = state.get('direct_task')
+        current_calls = state.get('llm_calls', 0)
+        results = {}
+        
+        try:
+            if task == 'assignment':
+                results = self._generate_assignment(state)
+            elif task == 'quiz':
+                results = self._generate_teacher_quiz(state)
+            results['llm_calls'] = current_calls + 1
+        except Exception as e:
+            print(f"[TeacherAgent] ❌ Direct Task error: {e}")
+            
+        return results
 
     # ── Task generators (all use LLMRouter for automatic fallback) ───────────────
 
@@ -523,14 +541,17 @@ class TeacherAgent:
         builder.add_node("tool_node", TeacherTools.return_tool_node())
         builder.add_node("orchestrator", self.orchestrator)
         builder.add_node("grade_submissions_node", self.grade_submissions_node)
+        builder.add_node("direct_task_node", self.direct_task_node)
 
         # Routers & Edges
         builder.add_conditional_edges(START, self.entry_router, {
             "conversation": "llm_call",
-            "grade": "grade_submissions_node"
+            "grade": "grade_submissions_node",
+            "direct_task": "direct_task_node"
         })
         
         builder.add_edge("grade_submissions_node", END)
+        builder.add_edge("direct_task_node", END)
 
         builder.add_conditional_edges("llm_call", self.should_use_tool, {
             "call_tool": "tool_node",

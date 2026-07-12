@@ -89,6 +89,12 @@ class Agent():
             messages=[doc_message]+messages
 
         state_input={'system_prompt':system_prompt,'messages':messages}
+        
+        # Capture the state of the graph before starting this turn
+        try:
+            initial_state = (await self.agent_graph.aget_state(config)).values
+        except Exception:
+            initial_state = {}
         if self.document_context:
             state_input['files_input']=self.document_context
         if grade_test and test_submission:
@@ -145,15 +151,17 @@ class Agent():
         
         for key, description in output_mappings.items():
             if final_state.get(key):
-                yield {"type": key, "data": final_state[key]}
-                task_done.append(description)
+                if final_state.get(key) != initial_state.get(key):
+                    yield {"type": key, "data": final_state[key]}
+                    task_done.append(description)
                 
         if final_state.get('document'):
             doc = final_state['document']
-            self._last_generated_document = doc  # persist for upload_generated_file_to_classroom
-            yield {"type": "document", "data": doc}
-            doc_format = doc.get('format', '').upper()
-            task_done.append(f"{doc_format} document" if doc_format else "document")
+            if doc != initial_state.get('document'):
+                self._last_generated_document = doc  # persist for upload_generated_file_to_classroom
+                yield {"type": "document", "data": doc}
+                doc_format = doc.get('format', '').upper()
+                task_done.append(f"{doc_format} document" if doc_format else "document")
 
         if final_state.get('classroom_upload_result'):
             results = final_state['classroom_upload_result']

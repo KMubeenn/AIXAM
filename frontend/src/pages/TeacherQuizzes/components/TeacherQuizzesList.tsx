@@ -5,7 +5,6 @@ import {
   LuTrash2,
   LuEye,
   LuX,
-  LuClock,
   LuLoader,
   LuCircleCheck,
   LuCloudUpload,
@@ -68,15 +67,7 @@ const QuizDetailModal: React.FC<{ quizId: string; onClose: () => void }> = ({ qu
                     {quiz.questions?.length ?? 0}
                   </p>
                 </div>
-                {quiz.time_limit_minutes && (
-                  <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mb-0.5">Time Limit</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                      <LuClock className="w-4 h-4 text-blue-500" />
-                      {quiz.time_limit_minutes} min
-                    </p>
-                  </div>
-                )}
+
                 <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
                   <p className="text-xs text-gray-500 dark:text-slate-400 mb-0.5">Created Date</p>
                   <p className="text-lg font-bold text-gray-900 dark:text-white text-sm">

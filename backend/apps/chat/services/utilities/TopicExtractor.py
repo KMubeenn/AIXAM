@@ -25,7 +25,13 @@ class TopicExtractor:
         if not text or len(text.strip()) == 0:
             return "Mixed Topics"
         try:
-            response = await self.llm.ainvoke([self.prompt, HumanMessage(content=text)])
+            from apps.chat.services.utilities.LLMRouter import invoke_with_fallback
+            from asgiref.sync import sync_to_async
+            response = await sync_to_async(invoke_with_fallback)(
+                build_llm_fn=lambda base: base,
+                messages=[self.prompt, HumanMessage(content=text)],
+                temperature=0.1
+            )
             topic = response.content.strip().strip("'").strip('"')
             
             # 1. Define the banned words

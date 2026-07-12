@@ -36,7 +36,13 @@ Your job:
 4. Output ONLY the topic string and nothing else. Do not include quotes, markdown, or punctuation.
 """
         try:
-            response = await self.llm.ainvoke([HumanMessage(content=prompt)])
+            from apps.chat.services.utilities.LLMRouter import invoke_with_fallback
+            from asgiref.sync import sync_to_async
+            response = await sync_to_async(invoke_with_fallback)(
+                build_llm_fn=lambda base: base,
+                messages=[HumanMessage(content=prompt)],
+                temperature=0.1
+            )
             topic = response.content.strip().strip("'").strip('"')
             
             if not topic:

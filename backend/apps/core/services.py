@@ -550,7 +550,7 @@ class CoreService:
     @sync_to_async
     def get_teacher_assignments(user_id):
         from apps.core.models import Assignment, Submission
-        assignments = list(Assignment.objects.filter(created_by_id=user_id).order_by('-created_at')[:50])
+        assignments = list(Assignment.objects.filter(created_by_id=user_id, quiz__isnull=False).order_by('-created_at')[:50])
         result = []
         for a in assignments:
             subs = list(Submission.objects.filter(assignment_id=a.id))

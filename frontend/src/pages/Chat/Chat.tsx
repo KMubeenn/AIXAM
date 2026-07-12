@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FiSend, FiPaperclip, FiArrowLeft, FiMoreVertical, FiLayers, FiFileText, FiCheckCircle, FiDownload, FiClipboard, FiFolder, FiX } from "react-icons/fi";
+import { FiSend, FiPaperclip, FiArrowLeft, FiLayers, FiFileText, FiCheckCircle, FiDownload, FiClipboard, FiFolder, FiX } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useChat } from "../../hooks/useChat";
 import StudentSidebar from "../StudentDashboard/components/Sidebar";
@@ -185,11 +185,6 @@ const Chat: React.FC = () => {
                 </span>
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-500 transition-colors">
-              <FiMoreVertical className="w-5 h-5" />
-            </button>
           </div>
         </header>
 
