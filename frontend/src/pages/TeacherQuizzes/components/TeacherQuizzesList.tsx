@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import {
   LuFileQuestion,
@@ -24,7 +25,7 @@ const QuizDetailModal: React.FC<{ quizId: string; onClose: () => void }> = ({ qu
   const { data: quizData, isLoading } = useQuizDetail(quizId);
   const quiz = quizData;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700">
         {/* Header */}
@@ -142,7 +143,48 @@ const QuizDetailModal: React.FC<{ quizId: string; onClose: () => void }> = ({ qu
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
+  );
+};
+
+// ── Delete Confirm Modal ──────────────────────────────────────────────────────────
+
+const DeleteConfirmModal: React.FC<{
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}> = ({ title, message, onConfirm, onClose }) => {
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-200 dark:border-slate-800 space-y-6 transform scale-95 transition-transform duration-200">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-600 dark:text-red-400 flex-shrink-0">
+            <LuTrash2 className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
+            <p className="text-sm text-gray-500 dark:text-slate-400 leading-relaxed">{message}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-350 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl text-sm font-semibold transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 };
 
@@ -155,13 +197,12 @@ const TeacherQuizzesList: React.FC = () => {
   const deleteQuiz = useDeleteQuiz();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(searchParams.get("quizId"));
+  const [quizToDelete, setQuizToDelete] = useState<string | null>(null);
   const quizzes = data?.quizzes ?? [];
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm("Delete this quiz? This cannot be undone.")) {
-      deleteQuiz.mutate(id);
-    }
+    setQuizToDelete(id);
   };
 
   return (
@@ -176,6 +217,18 @@ const TeacherQuizzesList: React.FC = () => {
               setSearchParams(searchParams);
             }
           }}
+        />
+      )}
+
+      {quizToDelete && (
+        <DeleteConfirmModal
+          title="Delete Quiz"
+          message="Are you sure you want to delete this quiz? This action cannot be undone."
+          onConfirm={() => {
+            deleteQuiz.mutate(quizToDelete);
+            setQuizToDelete(null);
+          }}
+          onClose={() => setQuizToDelete(null)}
         />
       )}
 

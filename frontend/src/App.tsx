@@ -11,6 +11,7 @@ import TeacherQuizzes from "./pages/TeacherQuizzes/TeacherQuizzes";
 import Classroom from "./pages/Classroom/Classroom";
 import TeacherProfile from "./pages/TeacherProfile/TeacherProfile";
 import StudentProfile from "./pages/StudentProfile/StudentProfile";
+import TeacherDashboard from "./pages/TeacherDashboard/TeacherDashboard";
 
 import AuthLayout from "./layouts/AuthLayout";
 
@@ -30,7 +31,7 @@ const App: React.FC = () => {
         {/* Home Route (Standalone Layout) */}
         <Route path="/" element={<Home />} />
         <Route path="/student-dashboard" element={<StudentDashboard />} />
-        <Route path="/teacher-dashboard" element={<Navigate to="/classroom" replace />} />
+        <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/flashcards" element={<FlashcardsPage />} />
