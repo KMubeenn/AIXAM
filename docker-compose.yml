@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: aixam_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aixam
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_local_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - aixam_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aixam"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aixam_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
+    environment:
+      SUPABASE_DB_HOST: db
+      SUPABASE_DB_PORT: 5432
+      SUPABASE_DB_NAME: aixam
+      SUPABASE_DB_USER: postgres
+      SUPABASE_DB_PASSWORD: postgres_local_password
+      DJANGO_SECRET_KEY: dev-docker-secret-key-change-in-production
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+    networks:
+      - aixam_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aixam_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+    ports:
+      - "3000:3000"
+    networks:
+      - aixam_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  aixam_network:
+    driver: bridge

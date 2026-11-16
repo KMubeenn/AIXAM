@@ -33,3 +33,11 @@ Aixam.pem
 
 
 Aws_elastic_ip=107.22.44.245
+*.pdf
+*.pptx
+backend_schema_erd.md
+*.zip
+/SCREENSHOTS/
+/DOCUMENTS/
+/DIAGRAMS/
+/things_to_do/
