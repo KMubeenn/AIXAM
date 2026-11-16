@@ -17,6 +17,11 @@ class BaseState(TypedDict , total=False):
     # classroom : dict
     # final_result : bool
 
+    # ── Self-Correction Fields ───────────────────────────────────────────────
+    retry_count : int       # Tracks validation attempts (max 3)
+    error_feedback : str    # Detailed schema error message fed back to the LLM
+    is_schema_valid : bool  # Flag indicating whether output conformed to schema
+
 
 class Document(TypedDict,total=False):
     title:str

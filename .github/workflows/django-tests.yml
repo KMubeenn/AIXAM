@@ -1,0 +1,41 @@
+name: Django Tests
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DJANGO_SETTINGS_MODULE: configs.settings
+      SECRET_KEY: ci-secret-key-not-for-production
+      DEBUG: "True"
+      GEMINI_API_KEY: mocked-gemini-key-for-ci
+      GROQ_API_KEY: mocked-groq-key-for-ci
+      PINECONE_API_KEY: mocked-pinecone-key-for-ci
+      DATABASE_URL: sqlite:///test_db.sqlite3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --frozen --no-dev
+
+      - name: Run tests
+        working-directory: backend
+        run: uv run pytest tests/ -v
+

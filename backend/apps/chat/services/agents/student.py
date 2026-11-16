@@ -282,34 +282,117 @@ class StudentAgent():
         return {"document":{"title":title,"content":content,"format":doc_format,**doc_result}}
 
     # ──────────────────────────────────────────────
+    # SELF-CORRECTION NODES
+    # ──────────────────────────────────────────────
+
+    def generate_flashcards_node(self, state: StudentState) -> StudentState:
+        """
+        Dedicated graph node for flashcard generation.
+        Wraps _generate_flashcards() and initialises self-correction state.
+        Called by the retry loop instead of direct_task_node when retrying.
+        """
+        retry_count = state.get("retry_count", 0)
+        error_feedback = state.get("error_feedback", "")
+        task_prompt = StudentAgent.load_task_prompt("flashcard_prompt.md")
+        messages = self._build_task_messages(state, task_prompt)
+
+        if error_feedback:
+            from langchain.messages import SystemMessage as SM
+            messages.append(SM(content=(
+                f"Your previous response did not match the required schema. "
+                f"Error: {error_feedback}. "
+                "Please return a valid JSON object with the key 'cards', "
+                "where each card has 'id', 'question', and 'answer'."
+            )))
+
+        try:
+            result = invoke_with_fallback(self._flashcard_builder(), messages, self.temperature)
+            current_calls = state.get("llm_calls", 0)
+            return {
+                "flashcards": result["cards"],
+                "is_schema_valid": True,
+                "retry_count": retry_count,
+                "llm_calls": current_calls + 1,
+            }
+        except Exception as exc:
+            current_calls = state.get("llm_calls", 0)
+            return {
+                "is_schema_valid": False,
+                "error_feedback": str(exc),
+                "retry_count": retry_count + 1,
+                "llm_calls": current_calls + 1,
+            }
+
+    def route_schema_validation(self, state: StudentState) -> str:
+        """
+        Conditional edge: decides whether to retry flashcard generation
+        or accept the result and move to END.
+
+        Returns:
+            "retry"    – schema invalid and retries remaining
+            "end"      – schema valid OR max retries (3) exhausted
+        """
+        MAX_RETRIES = 3
+        is_valid = state.get("is_schema_valid", True)
+        retry_count = state.get("retry_count", 0)
+
+        if not is_valid and retry_count < MAX_RETRIES:
+            print(f"[StudentAgent] ⚠ Schema invalid – retry {retry_count}/{MAX_RETRIES}")
+            return "retry"
+
+        if not is_valid:
+            print(f"[StudentAgent] ✗ Max retries ({MAX_RETRIES}) reached – aborting.")
+
+        return "end"
+
+    def fallback_recovery_node(self, state: StudentState) -> StudentState:
+        """
+        Terminal fallback node reached when all retries are exhausted.
+        Returns an empty flashcard list so the caller never receives None.
+        """
+        print("[StudentAgent] ✗ Fallback recovery triggered – returning empty flashcard set.")
+        return {
+            "flashcards": [],
+            "is_schema_valid": False,
+        }
+
+    # ──────────────────────────────────────────────
     # GRAPH BUILDER
     # ──────────────────────────────────────────────
 
-    def agent_builder(self)-> StateGraph:
-        agent_builder=StateGraph(StudentState)
+    def agent_builder(self) -> StateGraph:
+        agent_builder = StateGraph(StudentState)
 
-        agent_builder.add_node("llm_call",self.conversation)
-        agent_builder.add_node("tool_node",StudentTools.return_tool_node())
-        agent_builder.add_node("orchestrator",self.orchestrator)
-        agent_builder.add_node("grade_mock_test_node",self.grade_mock_test)
-        agent_builder.add_node("direct_task_node",self.direct_task_node)
+        agent_builder.add_node("llm_call", self.conversation)
+        agent_builder.add_node("tool_node", StudentTools.return_tool_node())
+        agent_builder.add_node("orchestrator", self.orchestrator)
+        agent_builder.add_node("grade_mock_test_node", self.grade_mock_test)
+        agent_builder.add_node("direct_task_node", self.direct_task_node)
+        agent_builder.add_node("generate_flashcards", self.generate_flashcards_node)
+        agent_builder.add_node("fallback_recovery", self.fallback_recovery_node)
 
-        agent_builder.add_conditional_edges(START,self.entry_router,{
-            "conversation":"llm_call",
-            "grade":"grade_mock_test_node",
-            "direct_task":"direct_task_node"
+        agent_builder.add_conditional_edges(START, self.entry_router, {
+            "conversation": "llm_call",
+            "grade": "grade_mock_test_node",
+            "direct_task": "direct_task_node",
         })
 
-        agent_builder.add_conditional_edges("llm_call",self.should_use_tool,{
-            "call_tool":"tool_node",
-            "pass":END
+        agent_builder.add_conditional_edges("llm_call", self.should_use_tool, {
+            "call_tool": "tool_node",
+            "pass": END,
         })
 
-        agent_builder.add_edge("tool_node","orchestrator")
-        agent_builder.add_edge("orchestrator",END)
-        agent_builder.add_edge("grade_mock_test_node",END)
-        agent_builder.add_edge("direct_task_node",END)
+        agent_builder.add_conditional_edges("generate_flashcards", self.route_schema_validation, {
+            "retry": "generate_flashcards",
+            "end": END,
+        })
 
-        agent=agent_builder.compile(checkpointer=self.memory)
+        agent_builder.add_edge("tool_node", "orchestrator")
+        agent_builder.add_edge("orchestrator", END)
+        agent_builder.add_edge("grade_mock_test_node", END)
+        agent_builder.add_edge("direct_task_node", END)
+        agent_builder.add_edge("fallback_recovery", END)
+
+        agent = agent_builder.compile(checkpointer=self.memory)
 
         return agent
