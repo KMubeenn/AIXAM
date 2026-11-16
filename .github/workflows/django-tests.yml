@@ -12,6 +12,7 @@ jobs:
 
     env:
       DJANGO_SETTINGS_MODULE: configs.settings
+      TESTING: "True"
       SECRET_KEY: ci-secret-key-not-for-production
       DEBUG: "True"
       GEMINI_API_KEY: mocked-gemini-key-for-ci

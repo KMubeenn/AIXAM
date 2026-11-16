@@ -71,8 +71,8 @@ def test_api_prefix_exists(api_client):
 def test_login_success(api_client, test_user):
     """Valid credentials must return HTTP 200 and a token."""
     response = api_client.post(
-        "/api/users/login/",
-        data={"username": "testuser", "password": "TestPass123!"},
+        "/api/auth/login/",
+        data={"email": "test@example.com", "password": "TestPass123!"},
         content_type="application/json",
     )
     assert response.status_code == 200
@@ -84,8 +84,8 @@ def test_login_success(api_client, test_user):
 def test_login_invalid_credentials(api_client):
     """Wrong credentials must return HTTP 401."""
     response = api_client.post(
-        "/api/users/login/",
-        data={"username": "ghost", "password": "wrongpass"},
+        "/api/auth/login/",
+        data={"email": "ghost@example.com", "password": "wrongpass"},
         content_type="application/json",
     )
     assert response.status_code == 401
@@ -109,8 +109,10 @@ def test_chat_endpoint_mocked_response(authenticated_client, mock_llm_router):
     """Authenticated request with mocked LLM must return HTTP 200."""
     response = authenticated_client.post(
         "/api/chat/",
-        data={"message": "Explain photosynthesis"},
+        data={"message": "Explain photosynthesis", "create_session": True},
         content_type="application/json",
     )
     assert response.status_code == 200
+    # Consume the streaming response so the agent node is actually invoked
+    _ = list(response.streaming_content)
     mock_llm_router.assert_called()

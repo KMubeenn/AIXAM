@@ -7,7 +7,14 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1", "3.239.50.12", "100.49.176.178", "*"]
 
 # Database configuration - Supabase PostgreSQL
 import sys
-if 'pytest' in sys.modules or 'test' in sys.argv:
+_IS_TESTING = (
+    "pytest" in sys.modules
+    or "_pytest" in sys.modules
+    or any("pytest" in arg or "test" in arg for arg in sys.argv)
+    or os.getenv("TESTING", "False").lower() in ("true", "1")
+)
+
+if _IS_TESTING:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -24,6 +31,7 @@ else:
             "PASSWORD": os.getenv("SUPABASE_DB_PASSWORD", ""),
             "HOST": os.getenv("SUPABASE_DB_HOST", "localhost"),
             "PORT": os.getenv("SUPABASE_DB_PORT", "5432"),
+            "ATOMIC_REQUESTS": False,
             "OPTIONS": {
                 "sslmode": "require",
             },
